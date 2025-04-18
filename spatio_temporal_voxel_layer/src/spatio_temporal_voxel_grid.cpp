@@ -272,6 +272,7 @@ void SpatioTemporalVoxelGrid::operator()(
 {
   if (obs._marking) {
     float mark_range_2 = obs._obstacle_range_in_m * obs._obstacle_range_in_m;
+    float mark_min_range_2 = obs._min_obstacle_range_in_m * obs._min_obstacle_range_in_m;
     const double cur_time = _clock->now().seconds();
 
     const sensor_msgs::msg::PointCloud2 & cloud = *(obs._cloud);
@@ -286,7 +287,7 @@ void SpatioTemporalVoxelGrid::operator()(
         (*iter_x - obs._origin.x) * (*iter_x - obs._origin.x) +
         (*iter_y - obs._origin.y) * (*iter_y - obs._origin.y) +
         (*iter_z - obs._origin.z) * (*iter_z - obs._origin.z);
-      if (distance_2 > mark_range_2 || distance_2 < 0.0001) {
+      if (distance_2 > mark_range_2 || distance_2 < mark_min_range_2) {
         continue;
       }
 

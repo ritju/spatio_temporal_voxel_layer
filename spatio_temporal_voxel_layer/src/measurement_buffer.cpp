@@ -53,7 +53,7 @@ MeasurementBuffer::MeasurementBuffer(
   const std::string & topic_name,
   const double & observation_keep_time, const double & expected_update_rate,
   const double & min_obstacle_height, const double & max_obstacle_height,
-  const double & obstacle_range, tf2_ros::Buffer & tf, const std::string & global_frame,
+  const double & obstacle_range, const double & min_obstacle_range, tf2_ros::Buffer & tf, const std::string & global_frame,
   const std::string & sensor_frame, const double & tf_tolerance,
   const double & min_d, const double & max_d, const double & vFOV,
   const double & vFOVPadding, const double & hFOV,
@@ -68,7 +68,7 @@ MeasurementBuffer::MeasurementBuffer(
   _last_updated(clock->now()),
   _global_frame(global_frame), _sensor_frame(sensor_frame), _source_name(source_name),
   _topic_name(topic_name), _min_obstacle_height(min_obstacle_height),
-  _max_obstacle_height(max_obstacle_height), _obstacle_range(obstacle_range),
+  _max_obstacle_height(max_obstacle_height), _obstacle_range(obstacle_range), _min_obstacle_range(min_obstacle_range),
   _tf_tolerance(tf_tolerance), _min_z(min_d), _max_z(max_d),
   _vertical_fov(vFOV), _vertical_fov_padding(vFOVPadding),
   _horizontal_fov(hFOV), _decay_acceleration(decay_acceleration),
@@ -121,6 +121,7 @@ void MeasurementBuffer::BufferROSCloud(
 
     _observation_list.front()._orientation = global_pose.pose.orientation;
     _observation_list.front()._obstacle_range_in_m = _obstacle_range;
+    _observation_list.front()._min_obstacle_range_in_m = _min_obstacle_range;
     _observation_list.front()._min_z_in_m = _min_z;
     _observation_list.front()._max_z_in_m = _max_z;
     _observation_list.front()._vertical_fov_in_rad = _vertical_fov;
