@@ -298,7 +298,8 @@ void SpatioTemporalVoxelLayer::onInitialize(void)
                  node->get_node_logging_interface(),
                  node->get_node_clock_interface(),
                  tf2::durationFromSec(transform_tolerance)));
-
+                 
+      auto laser_projector = std::make_shared<laser_geometry::LaserProjection>();
       if (inf_is_valid) {
         filter->registerCallback(
           std::bind(
