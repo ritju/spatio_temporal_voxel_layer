@@ -303,12 +303,12 @@ void SpatioTemporalVoxelLayer::onInitialize(void)
         filter->registerCallback(
           std::bind(
             &SpatioTemporalVoxelLayer::LaserScanValidInfCallback,
-            this, _1, _observation_buffers.back()));
+            this, _1, _observation_buffers.back(), laser_projector));
       } else {
         filter->registerCallback(
           std::bind(
             &SpatioTemporalVoxelLayer::LaserScanCallback,
-            this, _1, _observation_buffers.back()));
+            this, _1, _observation_buffers.back(), laser_projector));
       }
 
       _observation_subscribers.push_back(sub);
@@ -367,7 +367,8 @@ void SpatioTemporalVoxelLayer::onInitialize(void)
 /*****************************************************************************/
 void SpatioTemporalVoxelLayer::LaserScanCallback(
   sensor_msgs::msg::LaserScan::ConstSharedPtr message,
-  const std::shared_ptr<buffer::MeasurementBuffer> & buffer)
+  const std::shared_ptr<buffer::MeasurementBuffer> & buffer,
+  const std::shared_ptr<laser_geometry::LaserProjection> & laser_projector)
 /*****************************************************************************/
 {
   if (!buffer->IsEnabled()) {
@@ -377,14 +378,14 @@ void SpatioTemporalVoxelLayer::LaserScanCallback(
   sensor_msgs::msg::PointCloud2 cloud;
   cloud.header = message->header;
   try {
-    _laser_projector.transformLaserScanToPointCloud(
+    laser_projector->transformLaserScanToPointCloud(
       message->header.frame_id, *message, cloud, *tf_);
   } catch (tf2::TransformException & ex) {
     RCLCPP_WARN(
       logger_,
       "TF returned a transform exception to frame %s: %s",
       _global_frame.c_str(), ex.what());
-    _laser_projector.projectLaser(*message, cloud);
+    laser_projector->projectLaser(*message, cloud);
   }
   // buffer the point cloud
   buffer->Lock();
@@ -395,7 +396,8 @@ void SpatioTemporalVoxelLayer::LaserScanCallback(
 /*****************************************************************************/
 void SpatioTemporalVoxelLayer::LaserScanValidInfCallback(
   sensor_msgs::msg::LaserScan::ConstSharedPtr raw_message,
-  const std::shared_ptr<buffer::MeasurementBuffer> & buffer)
+  const std::shared_ptr<buffer::MeasurementBuffer> & buffer,
+  const std::shared_ptr<laser_geometry::LaserProjection> & laser_projector)
 /*****************************************************************************/
 {
   if (!buffer->IsEnabled()) {
@@ -413,14 +415,14 @@ void SpatioTemporalVoxelLayer::LaserScanValidInfCallback(
   sensor_msgs::msg::PointCloud2 cloud;
   cloud.header = message.header;
   try {
-    _laser_projector.transformLaserScanToPointCloud(
+    laser_projector->transformLaserScanToPointCloud(
       message.header.frame_id, message, cloud, *tf_);
   } catch (tf2::TransformException & ex) {
     RCLCPP_WARN(
       logger_,
       "TF returned a transform exception to frame %s: %s",
       _global_frame.c_str(), ex.what());
-    _laser_projector.projectLaser(message, cloud);
+    laser_projector->projectLaser(message, cloud);
   }
   // buffer the point cloud
   buffer->Lock();

@@ -138,10 +138,12 @@ private:
   // Sensor callbacks
   void LaserScanCallback(
     sensor_msgs::msg::LaserScan::ConstSharedPtr message,
-    const std::shared_ptr<buffer::MeasurementBuffer> & buffer);
+    const std::shared_ptr<buffer::MeasurementBuffer> & buffer,
+    const std::shared_ptr<laser_geometry::LaserProjection> & laser_projector);
   void LaserScanValidInfCallback(
     sensor_msgs::msg::LaserScan::ConstSharedPtr raw_message,
-    const std::shared_ptr<buffer::MeasurementBuffer> & buffer);
+    const std::shared_ptr<buffer::MeasurementBuffer> & buffer,
+    const std::shared_ptr<laser_geometry::LaserProjection> & laser_projector);
   void PointCloud2Callback(
     sensor_msgs::msg::PointCloud2::ConstSharedPtr message,
     const std::shared_ptr<buffer::MeasurementBuffer> & buffer);
@@ -166,7 +168,7 @@ private:
   rcl_interfaces::msg::SetParametersResult
     dynamicParametersCallback(std::vector<rclcpp::Parameter> parameters);
 
-  laser_geometry::LaserProjection _laser_projector;
+  // laser_geometry::LaserProjection _laser_projector;
   std::vector<std::shared_ptr<message_filters::SubscriberBase<rclcpp_lifecycle::LifecycleNode>>>
     _observation_subscribers;
   std::vector<std::shared_ptr<tf2_ros::MessageFilterBase>> _observation_notifiers;
