@@ -39,6 +39,8 @@
 #include <unordered_map>
 #include <string>
 #include <vector>
+#include <cmath>
+#include <algorithm>
 
 #include "spatio_temporal_voxel_layer/spatio_temporal_voxel_grid.hpp"
 
@@ -290,6 +292,17 @@ void SpatioTemporalVoxelGrid::operator()(
       if (distance_2 > mark_range_2 || distance_2 < mark_min_range_2) {
         continue;
       }
+      if (obs._enable_cut && *iter_z > obs._cut_min_z_in_m && *iter_z < obs._cut_max_z_in_m) {
+        geometry_msgs::msg::Point point;
+        point.x = *iter_x;
+        point.y = *iter_y;
+        point.z = *iter_z;
+        bool is_point_in_cut_volume = IsPointInRectangle(obs._cut_inside, obs._cut_extend, point);
+        if (is_point_in_cut_volume)
+        {
+          continue;
+        }
+      }
 
       double x = *iter_x < 0 ? *iter_x - _voxel_size : *iter_x;
       double y = *iter_y < 0 ? *iter_y - _voxel_size : *iter_y;
@@ -494,6 +507,63 @@ bool SpatioTemporalVoxelGrid::SaveGrid(
     return false;
   }
   return false;  // best offense is a good defense
+}
+
+double SpatioTemporalVoxelGrid::CrossProduct(const geometry_msgs::msg::Point & first_point,
+                                             const geometry_msgs::msg::Point & second_point,
+                                             const geometry_msgs::msg::Point & point) const
+{
+    double cross_product = (first_point.x - point.x) * (second_point.y - point.y) - 
+                           (first_point.y - point.y) * (second_point.x - point.x); 
+    
+    return cross_product;
+}
+
+bool SpatioTemporalVoxelGrid::IsPointInRectangle(const geometry_msgs::msg::Point& diagonal_1,
+                                                 const geometry_msgs::msg::Point& diagonal_2,
+                                                 const geometry_msgs::msg::Point& point) const
+{
+    // 步骤1: 根据对角点计算矩形的四个顶点 (按顺时针顺序)
+    std::vector<geometry_msgs::msg::Point> rectVertices(4);
+    rectVertices[0] = diagonal_1; // 顶点1 = 输入对角点1
+
+    geometry_msgs::msg::Point second_point, fourth_point;
+    second_point.x = diagonal_2.x;
+    second_point.y = diagonal_1.y;
+    second_point.z = diagonal_1.z;
+    rectVertices[1] = second_point; // 顶点2 = (diagonal_2.x, diagonal_1.y)
+
+    rectVertices[2] = diagonal_2; // 顶点3 = 输入对角点2
+
+    fourth_point.x = diagonal_1.x;
+    fourth_point.y = diagonal_2.y;
+    fourth_point.z = diagonal_1.z;
+    rectVertices[3] = fourth_point; // 顶点4 = (diagonal_1.x, diagonal_2.y)
+
+    // 步骤2: 计算点与每条边的叉积符号
+    int sign = 0;
+    for (int i = 0; i < 4; i++) 
+    {
+        int j = (i + 1) % 4; 
+        double cross = CrossProduct(rectVertices[i], rectVertices[j], point);
+        
+        // 初始化符号 (跳过零值)
+        if (cross != 0) {
+            if (sign == 0)
+            {
+                sign = (cross > 0) ? 1 : -1;
+            }
+            else
+            {
+                // 符号不一致则点在外侧
+                if ((sign == 1 && cross < 0) || (sign == -1 && cross > 0))
+                {
+                    return false;
+                }
+            }
+        }
+    }
+    return true;
 }
 
 }  // namespace volume_grid

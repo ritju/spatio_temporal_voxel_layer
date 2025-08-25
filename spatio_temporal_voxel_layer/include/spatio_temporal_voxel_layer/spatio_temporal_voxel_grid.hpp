@@ -150,6 +150,12 @@ public:
 
   // Save the file to file with size information
   bool SaveGrid(const std::string & file_name, double & map_size_bytes);
+  double CrossProduct(const geometry_msgs::msg::Point & first_point,
+                      const geometry_msgs::msg::Point & second_point,
+                      const geometry_msgs::msg::Point & point) const;
+  bool IsPointInRectangle(const geometry_msgs::msg::Point& diagonal_1,
+                          const geometry_msgs::msg::Point& diagonal_2,
+                          const geometry_msgs::msg::Point& point) const;
 
 protected:
   // Initialize grid metadata and library

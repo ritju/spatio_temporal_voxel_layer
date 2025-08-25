@@ -93,6 +93,16 @@ public:
     const double & max_obstacle_height,
     const double & obstacle_range,
     const double & min_obstacle_range,
+    const double & cut_inside_x,
+    const double & cut_inside_y,
+    const double & cut_min_z,
+    const double & cut_extend_x,
+    const double & cut_extend_y,
+    const double & cut_max_z,
+    const double & cut_outside_x,
+    const double & cut_outside_y,
+    const std::string & cut_base_frame,
+    const bool & enable_cut,
     tf2_ros::Buffer & tf,
     const std::string & global_frame,
     const std::string & sensor_frame,
@@ -159,6 +169,9 @@ private:
   std::string _global_frame, _sensor_frame, _source_name, _topic_name;
   std::list<observation::MeasurementReading> _observation_list;
   double _min_obstacle_height, _max_obstacle_height, _obstacle_range, _min_obstacle_range, _tf_tolerance;
+  double _cut_inside_x, _cut_inside_y, _cut_min_z, _cut_extend_x, _cut_extend_y, _cut_max_z, _cut_outside_x, _cut_outside_y;
+  bool _enable_cut;
+  std::string _cut_base_frame;
   double _min_z, _max_z, _vertical_fov, _vertical_fov_padding, _horizontal_fov;
   double _decay_acceleration, _voxel_size;
   bool _marking, _clearing;

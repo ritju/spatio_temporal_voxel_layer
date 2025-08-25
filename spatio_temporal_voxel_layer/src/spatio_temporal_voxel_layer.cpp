@@ -169,6 +169,10 @@ void SpatioTemporalVoxelLayer::onInitialize(void)
     double observation_keep_time, expected_update_rate, min_obstacle_height, max_obstacle_height;
     double min_z, max_z, vFOV, vFOVPadding;
     double hFOV, decay_acceleration, obstacle_range, min_obstacle_range;
+    double cut_inside_x, cut_inside_y, cut_min_z, cut_extend_x, cut_extend_y, cut_max_z;
+    double cut_outside_x, cut_outside_y;
+    std::string cut_base_frame;
+    bool enable_cut;
     std::string topic, sensor_frame, data_type, filter_str;
     bool inf_is_valid = false, clearing, marking;
     bool clear_after_reading, enabled;
@@ -188,7 +192,17 @@ void SpatioTemporalVoxelLayer::onInitialize(void)
     declareParameter(source + "." + "marking", rclcpp::ParameterValue(true));
     declareParameter(source + "." + "clearing", rclcpp::ParameterValue(false));
     declareParameter(source + "." + "obstacle_range", rclcpp::ParameterValue(2.5));
-    declareParameter(source + "." + "min_obstacle_range", rclcpp::ParameterValue(2.5));
+    declareParameter(source + "." + "min_obstacle_range", rclcpp::ParameterValue(0.0));
+    declareParameter(source + "." + "cut_inside_x", rclcpp::ParameterValue(0.0));
+    declareParameter(source + "." + "cut_inside_y", rclcpp::ParameterValue(0.0));
+    declareParameter(source + "." + "cut_min_z", rclcpp::ParameterValue(0.0));
+    declareParameter(source + "." + "cut_extend_x", rclcpp::ParameterValue(0.0));
+    declareParameter(source + "." + "cut_extend_y", rclcpp::ParameterValue(0.0));
+    declareParameter(source + "." + "cut_max_z", rclcpp::ParameterValue(0.0));
+    declareParameter(source + "." + "enable_cut", rclcpp::ParameterValue(false));
+    declareParameter(source + "." + "cut_outside_x", rclcpp::ParameterValue(0.0));
+    declareParameter(source + "." + "cut_outside_y", rclcpp::ParameterValue(0.0));
+    declareParameter(source + "." + "cut_base_frame", rclcpp::ParameterValue(std::string("base_footprint")));
     
 
     declareParameter(source + "." + "min_z", rclcpp::ParameterValue(0.0));
@@ -219,6 +233,17 @@ void SpatioTemporalVoxelLayer::onInitialize(void)
     node->get_parameter(name_ + "." + source + "." + "clearing", clearing);
     node->get_parameter(name_ + "." + source + "." + "obstacle_range", obstacle_range);
     node->get_parameter(name_ + "." + source + "." + "min_obstacle_range", min_obstacle_range);
+    node->get_parameter(name_ + "." + source + "." + "cut_inside_x", cut_inside_x);
+    node->get_parameter(name_ + "." + source + "." + "cut_inside_y", cut_inside_y);
+    node->get_parameter(name_ + "." + source + "." + "cut_min_z", cut_min_z);
+    node->get_parameter(name_ + "." + source + "." + "cut_extend_x", cut_extend_x);
+    node->get_parameter(name_ + "." + source + "." + "cut_extend_y", cut_extend_y);
+    node->get_parameter(name_ + "." + source + "." + "cut_max_z", cut_max_z);
+    node->get_parameter(name_ + "." + source + "." + "enable_cut", enable_cut);
+    node->get_parameter(name_ + "." + source + "." + "cut_outside_x", cut_outside_x);
+    node->get_parameter(name_ + "." + source + "." + "cut_outside_y", cut_outside_y);
+    node->get_parameter(name_ + "." + source + "." + "cut_base_frame", cut_base_frame);
+    
 
     // minimum distance from camera it can see
     node->get_parameter(name_ + "." + source + "." + "min_z", min_z);
@@ -267,7 +292,13 @@ void SpatioTemporalVoxelLayer::onInitialize(void)
         new buffer::MeasurementBuffer(
           source, topic,
           observation_keep_time, expected_update_rate, min_obstacle_height,
-          max_obstacle_height, obstacle_range, min_obstacle_range, *tf_, _global_frame, sensor_frame,
+          max_obstacle_height, obstacle_range, min_obstacle_range,
+          cut_inside_x, cut_inside_y, cut_min_z,
+          cut_extend_x, cut_extend_y, cut_max_z, 
+          cut_outside_x, cut_outside_y,
+          cut_base_frame,
+          enable_cut,
+          *tf_, _global_frame, sensor_frame,
           transform_tolerance, min_z, max_z, vFOV, vFOVPadding, hFOV,
           decay_acceleration, marking, clearing, _voxel_size,
           filter, voxel_min_points, enabled, clear_after_reading, model_type,
@@ -386,7 +417,7 @@ void SpatioTemporalVoxelLayer::LaserScanCallback(
       logger_,
       "TF returned a transform exception to frame %s: %s",
       _global_frame.c_str(), ex.what());
-    laser_projector->projectLaser(*message, cloud);
+      laser_projector->projectLaser(*message, cloud);
   }
   // buffer the point cloud
   buffer->Lock();

@@ -53,7 +53,13 @@ MeasurementBuffer::MeasurementBuffer(
   const std::string & topic_name,
   const double & observation_keep_time, const double & expected_update_rate,
   const double & min_obstacle_height, const double & max_obstacle_height,
-  const double & obstacle_range, const double & min_obstacle_range, tf2_ros::Buffer & tf, const std::string & global_frame,
+  const double & obstacle_range, const double & min_obstacle_range,
+  const double & cut_inside_x, const double & cut_inside_y, const double & cut_min_z,
+  const double & cut_extend_x, const double & cut_extend_y, const double & cut_max_z,
+  const double & cut_outside_x, const double & cut_outside_y,
+  const std::string & cut_base_frame,
+  const bool & enable_cut,
+  tf2_ros::Buffer & tf, const std::string & global_frame,
   const std::string & sensor_frame, const double & tf_tolerance,
   const double & min_d, const double & max_d, const double & vFOV,
   const double & vFOVPadding, const double & hFOV,
@@ -69,6 +75,11 @@ MeasurementBuffer::MeasurementBuffer(
   _global_frame(global_frame), _sensor_frame(sensor_frame), _source_name(source_name),
   _topic_name(topic_name), _min_obstacle_height(min_obstacle_height),
   _max_obstacle_height(max_obstacle_height), _obstacle_range(obstacle_range), _min_obstacle_range(min_obstacle_range),
+  _cut_inside_x(cut_inside_x), _cut_inside_y(cut_inside_y), _cut_min_z(cut_min_z),
+  _cut_extend_x(cut_extend_x), _cut_extend_y(cut_extend_y), _cut_max_z(cut_max_z),
+  _cut_outside_x(cut_outside_x), _cut_outside_y(cut_outside_y),
+  _cut_base_frame(cut_base_frame),
+  _enable_cut(enable_cut),
   _tf_tolerance(tf_tolerance), _min_z(min_d), _max_z(max_d),
   _vertical_fov(vFOV), _vertical_fov_padding(vFOVPadding),
   _horizontal_fov(hFOV), _decay_acceleration(decay_acceleration),
@@ -115,15 +126,85 @@ void MeasurementBuffer::BufferROSCloud(
       tf2_ros::fromMsg(local_pose.header.stamp), tf2::durationFromSec(0.5));
     _buffer.transform(local_pose, global_pose, _global_frame);
 
+    geometry_msgs::msg::PoseStamped local_pose_inside, global_pose_inside;
+    local_pose_inside.pose.position.x = _cut_inside_x;
+    local_pose_inside.pose.position.y = _cut_inside_y;
+    local_pose_inside.pose.position.z = 0;
+    local_pose_inside.pose.orientation.x = 0;
+    local_pose_inside.pose.orientation.y = 0;
+    local_pose_inside.pose.orientation.z = 0;
+    local_pose_inside.pose.orientation.w = 1;
+    local_pose_inside.header.stamp = cloud.header.stamp;
+    local_pose_inside.header.frame_id = _cut_base_frame;
+
+    _buffer.canTransform(
+      _global_frame, local_pose_inside.header.frame_id,
+      tf2_ros::fromMsg(local_pose_inside.header.stamp), tf2::durationFromSec(0.5));
+    _buffer.transform(local_pose_inside, global_pose_inside, _global_frame);
+
+    geometry_msgs::msg::PoseStamped local_pose_outside, global_pose_outside;
+    local_pose_outside.pose.position.x = _cut_outside_x;
+    local_pose_outside.pose.position.y = _cut_outside_y;
+    local_pose_outside.pose.position.z = 0;
+    local_pose_outside.pose.orientation.x = 0;
+    local_pose_outside.pose.orientation.y = 0;
+    local_pose_outside.pose.orientation.z = 0;
+    local_pose_outside.pose.orientation.w = 1;
+    local_pose_outside.header.stamp = cloud.header.stamp;
+    local_pose_outside.header.frame_id = _cut_base_frame;
+
+    _buffer.canTransform(
+      _global_frame, local_pose_outside.header.frame_id,
+      tf2_ros::fromMsg(local_pose_outside.header.stamp), tf2::durationFromSec(0.5));
+    _buffer.transform(local_pose_outside, global_pose_outside, _global_frame);
+
+    geometry_msgs::msg::PoseStamped local_pose_extend, global_pose_extend;
+    local_pose_extend.pose.position.x = _cut_extend_x;
+    local_pose_extend.pose.position.y = _cut_extend_y;
+    local_pose_extend.pose.position.z = 0;
+    local_pose_extend.pose.orientation.x = 0;
+    local_pose_extend.pose.orientation.y = 0;
+    local_pose_extend.pose.orientation.z = 0;
+    local_pose_extend.pose.orientation.w = 1;
+    local_pose_extend.header.stamp = cloud.header.stamp;
+    local_pose_extend.header.frame_id = _cut_base_frame;
+
+    _buffer.canTransform(
+      _global_frame, local_pose_extend.header.frame_id,
+      tf2_ros::fromMsg(local_pose_extend.header.stamp), tf2::durationFromSec(0.5));
+    _buffer.transform(local_pose_extend, global_pose_extend, _global_frame);
+
     _observation_list.front()._origin.x = global_pose.pose.position.x;
     _observation_list.front()._origin.y = global_pose.pose.position.y;
     _observation_list.front()._origin.z = global_pose.pose.position.z;
+
+    _observation_list.front()._cut_outside.x = global_pose_outside.pose.position.x;
+    _observation_list.front()._cut_outside.y = global_pose_outside.pose.position.y;
+    _observation_list.front()._cut_outside.z = global_pose_outside.pose.position.z;
+
+    _observation_list.front()._cut_extend.x = global_pose_extend.pose.position.x;
+    _observation_list.front()._cut_extend.y = global_pose_extend.pose.position.y;
+    _observation_list.front()._cut_extend.z = global_pose_extend.pose.position.z;
+
+    _observation_list.front()._cut_inside.x = global_pose_inside.pose.position.x;
+    _observation_list.front()._cut_inside.y = global_pose_inside.pose.position.y;
+    _observation_list.front()._cut_inside.z = global_pose_inside.pose.position.z;
 
     _observation_list.front()._orientation = global_pose.pose.orientation;
     _observation_list.front()._obstacle_range_in_m = _obstacle_range;
     _observation_list.front()._min_obstacle_range_in_m = _min_obstacle_range;
     _observation_list.front()._min_z_in_m = _min_z;
     _observation_list.front()._max_z_in_m = _max_z;
+    _observation_list.front()._cut_inside_x_in_m = _cut_inside_x;
+    _observation_list.front()._cut_inside_y_in_m = _cut_inside_y;
+    _observation_list.front()._cut_min_z_in_m = _cut_min_z;
+    _observation_list.front()._cut_extend_x_in_m = _cut_extend_x;
+    _observation_list.front()._cut_extend_y_in_m = _cut_extend_y;
+    _observation_list.front()._cut_max_z_in_m = _cut_max_z;
+    _observation_list.front()._cut_outside_x_in_m = _cut_outside_x;
+    _observation_list.front()._cut_outside_y_in_m = _cut_outside_y;
+    _observation_list.front()._cut_base_frame = _cut_base_frame;
+    _observation_list.front()._enable_cut = _enable_cut;
     _observation_list.front()._vertical_fov_in_rad = _vertical_fov;
     _observation_list.front()._vertical_fov_padding_in_m =
       _vertical_fov_padding;
