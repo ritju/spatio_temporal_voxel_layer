@@ -38,6 +38,7 @@ find_package(Eigen3 REQUIRED)
 find_package(Boost REQUIRED COMPONENTS system thread)
 
 find_package(PCL REQUIRED COMPONENTS filters common)
+find_package(tf2_eigen REQUIRED)
 if(NOT "${PCL_LIBRARIES}" STREQUAL "")
   # This package fails to build on Debian Stretch with a linking error against
   # 'Qt5::Widgets'.  This is a transitive dependency that comes in to PCL via
@@ -71,6 +72,7 @@ set(dependencies
   visualization_msgs
   builtin_interfaces
   openvdb_vendor
+  tf2_eigen
 )
 
 set(library_name spatio_temporal_voxel_layer_core)

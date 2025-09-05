@@ -41,6 +41,7 @@
 #include "spatio_temporal_voxel_layer/measurement_buffer.hpp"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include "tf2_sensor_msgs/tf2_sensor_msgs.hpp"
+#include "tf2_eigen/tf2_eigen.hpp"
 
 namespace buffer
 {
@@ -221,20 +222,54 @@ void MeasurementBuffer::BufferROSCloud(
 
     // transform the cloud in the global frame
     point_cloud_ptr cld_global(new sensor_msgs::msg::PointCloud2());
-    geometry_msgs::msg::TransformStamped tf_stamped =
-      _buffer.lookupTransform(
-      _global_frame, cloud.header.frame_id,
-      tf2_ros::fromMsg(cloud.header.stamp));
-    tf2::doTransform(cloud, *cld_global, tf_stamped);
+    // geometry_msgs::msg::TransformStamped tf_stamped =
+    //   _buffer.lookupTransform(
+    //   _global_frame, cloud.header.frame_id,
+    //   tf2_ros::fromMsg(cloud.header.stamp));
+    // tf2::doTransform(cloud, *cld_global, tf_stamped);
 
-    pcl::PCLPointCloud2::Ptr cloud_pcl(new pcl::PCLPointCloud2());
-    pcl::PCLPointCloud2::Ptr cloud_filtered(new pcl::PCLPointCloud2());
+    // pcl::PCLPointCloud2::Ptr cloud_pcl(new pcl::PCLPointCloud2());
+    // pcl::PCLPointCloud2::Ptr cloud_filtered(new pcl::PCLPointCloud2());
+
+    // // remove points that are below or above our height restrictions, and
+    // // in the same time, remove NaNs and if user wants to use it, combine with a
+    // if (_filter == Filters::VOXEL) {
+    //   pcl_conversions::toPCL(*cld_global, *cloud_pcl);
+    //   pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
+    //   sor.setInputCloud(cloud_pcl);
+    //   sor.setFilterFieldName("z");
+    //   sor.setFilterLimits(_min_obstacle_height, _max_obstacle_height);
+    //   sor.setDownsampleAllData(false);
+    //   float v_s = static_cast<float>(_voxel_size);
+    //   sor.setLeafSize(v_s, v_s, v_s);
+    //   sor.setMinimumPointsNumberPerVoxel(static_cast<unsigned int>(_voxel_min_points));
+    //   sor.filter(*cloud_filtered);
+    //   pcl_conversions::fromPCL(*cloud_filtered, *cld_global);
+    // } else if (_filter == Filters::PASSTHROUGH) {
+    //   pcl_conversions::toPCL(*cld_global, *cloud_pcl);
+    //   pcl::PassThrough<pcl::PCLPointCloud2> pass_through_filter;
+    //   pass_through_filter.setInputCloud(cloud_pcl);
+    //   pass_through_filter.setKeepOrganized(false);
+    //   pass_through_filter.setFilterFieldName("z");
+    //   pass_through_filter.setFilterLimits(
+    //     _min_obstacle_height, _max_obstacle_height);
+    //   pass_through_filter.filter(*cloud_filtered);
+    //   pcl_conversions::fromPCL(*cloud_filtered, *cld_global);
+    // }
+
+    std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> cloud_pcl(new pcl::PointCloud<pcl::PointXYZ>());
+    std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>());
 
     // remove points that are below or above our height restrictions, and
     // in the same time, remove NaNs and if user wants to use it, combine with a
     if (_filter == Filters::VOXEL) {
-      pcl_conversions::toPCL(*cld_global, *cloud_pcl);
-      pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
+      geometry_msgs::msg::TransformStamped tf_stamped =
+      _buffer.lookupTransform(
+      _global_frame, cloud.header.frame_id,
+      tf2_ros::fromMsg(cloud.header.stamp));
+      tf2::doTransform(cloud, *cld_global, tf_stamped);
+      pcl::fromROSMsg(*cld_global, *cloud_pcl);
+      pcl::VoxelGrid<pcl::PointXYZ> sor;
       sor.setInputCloud(cloud_pcl);
       sor.setFilterFieldName("z");
       sor.setFilterLimits(_min_obstacle_height, _max_obstacle_height);
@@ -243,17 +278,43 @@ void MeasurementBuffer::BufferROSCloud(
       sor.setLeafSize(v_s, v_s, v_s);
       sor.setMinimumPointsNumberPerVoxel(static_cast<unsigned int>(_voxel_min_points));
       sor.filter(*cloud_filtered);
-      pcl_conversions::fromPCL(*cloud_filtered, *cld_global);
+      pcl::toROSMsg(*cloud_filtered, *cld_global);
     } else if (_filter == Filters::PASSTHROUGH) {
-      pcl_conversions::toPCL(*cld_global, *cloud_pcl);
-      pcl::PassThrough<pcl::PCLPointCloud2> pass_through_filter;
+      std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> cloud_filtered_in_base_footprint(new pcl::PointCloud<pcl::PointXYZ>);
+      point_cloud_ptr cld_global_in_base_footprint(new sensor_msgs::msg::PointCloud2());
+      geometry_msgs::msg::TransformStamped tf_stamped_to_base_footprint =
+      _buffer.lookupTransform(
+      "base_footprint", cloud.header.frame_id,
+      tf2_ros::fromMsg(cloud.header.stamp));
+      tf2::doTransform(cloud, *cld_global_in_base_footprint, tf_stamped_to_base_footprint);
+      pcl::fromROSMsg(*cld_global_in_base_footprint, *cloud_pcl);
+      pcl::PassThrough<pcl::PointXYZ> pass_through_filter;
       pass_through_filter.setInputCloud(cloud_pcl);
       pass_through_filter.setKeepOrganized(false);
       pass_through_filter.setFilterFieldName("z");
       pass_through_filter.setFilterLimits(
         _min_obstacle_height, _max_obstacle_height);
-      pass_through_filter.filter(*cloud_filtered);
-      pcl_conversions::fromPCL(*cloud_filtered, *cld_global);
+      pass_through_filter.filter(*cloud_filtered_in_base_footprint);
+
+      pass_through_filter.setInputCloud(cloud_filtered_in_base_footprint);
+      pass_through_filter.setKeepOrganized(false);
+      pass_through_filter.setFilterFieldName("y");
+      if (_cut_inside_y < _cut_extend_y)
+      {
+        pass_through_filter.setFilterLimits(_cut_inside_y, _cut_extend_y);
+      } else {
+        pass_through_filter.setFilterLimits(_cut_extend_y, _cut_inside_y);
+      }
+      pass_through_filter.filter(*cloud_filtered_in_base_footprint);
+      geometry_msgs::msg::TransformStamped tf_stamped =
+      _buffer.lookupTransform(
+      _global_frame, "base_footprint",
+      tf2_ros::fromMsg(cloud.header.stamp));
+      Eigen::Affine3f latest_transform = Eigen::Affine3f::Identity();
+      latest_transform = tf2::transformToEigen(tf_stamped).cast<float>();
+      pcl::transformPointCloud<pcl::PointXYZ>(*cloud_filtered_in_base_footprint, *cloud_filtered, latest_transform);
+      
+      pcl::toROSMsg(*cloud_filtered, *cld_global);
     }
 
     _observation_list.front()._cloud.reset(cld_global.release());
