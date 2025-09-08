@@ -297,7 +297,7 @@ void SpatioTemporalVoxelGrid::operator()(
         point.x = *iter_x;
         point.y = *iter_y;
         point.z = *iter_z;
-        bool is_point_in_cut_volume = IsPointInRectangle(obs._cut_inside, obs._cut_extend, point);
+        bool is_point_in_cut_volume = IsPointInRectangle(obs._cut_inside, obs._cut_outside, obs._cut_extend_outside, obs._cut_extend_inside, point);
         if (is_point_in_cut_volume)
         {
           continue;
@@ -519,33 +519,27 @@ double SpatioTemporalVoxelGrid::CrossProduct(const geometry_msgs::msg::Point & f
     return cross_product;
 }
 
-bool SpatioTemporalVoxelGrid::IsPointInRectangle(const geometry_msgs::msg::Point& diagonal_1,
-                                                 const geometry_msgs::msg::Point& diagonal_2,
+bool SpatioTemporalVoxelGrid::IsPointInRectangle(const geometry_msgs::msg::Point& inside,
+                                                 const geometry_msgs::msg::Point& outside,
+                                                 const geometry_msgs::msg::Point& extend_outside,
+                                                 const geometry_msgs::msg::Point& extend_inside,
                                                  const geometry_msgs::msg::Point& point) const
 {
     // 步骤1: 根据对角点计算矩形的四个顶点 (按顺时针顺序)
-    std::vector<geometry_msgs::msg::Point> rectVertices(4);
-    rectVertices[0] = diagonal_1; // 顶点1 = 输入对角点1
+    std::vector<geometry_msgs::msg::Point> rectvertices(4);
+    rectvertices[0] = inside;
+    rectvertices[1] = outside;
+    rectvertices[2] = extend_outside;
+    rectvertices[3] = extend_inside;
 
-    geometry_msgs::msg::Point second_point, fourth_point;
-    second_point.x = diagonal_2.x;
-    second_point.y = diagonal_1.y;
-    second_point.z = diagonal_1.z;
-    rectVertices[1] = second_point; // 顶点2 = (diagonal_2.x, diagonal_1.y)
 
-    rectVertices[2] = diagonal_2; // 顶点3 = 输入对角点2
-
-    fourth_point.x = diagonal_1.x;
-    fourth_point.y = diagonal_2.y;
-    fourth_point.z = diagonal_1.z;
-    rectVertices[3] = fourth_point; // 顶点4 = (diagonal_1.x, diagonal_2.y)
 
     // 步骤2: 计算点与每条边的叉积符号
     int sign = 0;
     for (int i = 0; i < 4; i++) 
     {
         int j = (i + 1) % 4; 
-        double cross = CrossProduct(rectVertices[i], rectVertices[j], point);
+        double cross = CrossProduct(rectvertices[i], rectvertices[j], point);
         
         // 初始化符号 (跳过零值)
         if (cross != 0) {
@@ -564,6 +558,39 @@ bool SpatioTemporalVoxelGrid::IsPointInRectangle(const geometry_msgs::msg::Point
         }
     }
     return true;
+}
+
+bool SpatioTemporalVoxelGrid::AreVerticesOrdered(const std::vector<geometry_msgs::msg::Point>& rectvertices) {
+    // 检查输入顶点数量
+    if (rectvertices.size() != 4)
+    {
+      std::cout << "Vertices size is less than 4, current size: " << rectvertices.size() << " !" << std::endl;
+      return false; 
+    }
+    const double epsilon = 1e-9;
+    int prev_sign = 0; 
+    for (int i = 0; i < 4; ++i) {
+        int j = (i + 1) % 4; 
+        int k = (i + 2) % 4; 
+        // 计算向量 (v_i -> v_j) 和向量 (v_i -> v_k) 的叉积
+        double cross = CrossProduct(rectvertices[i], rectvertices[k], rectvertices[j]);
+
+        // 确定当前叉积的符号
+        int current_sign = 0;
+        if (cross > epsilon) {current_sign = 1;}
+        else if (cross < -epsilon) {current_sign = -1;}
+        else {return false;}
+        if (prev_sign == 0) {prev_sign = current_sign;}
+        else 
+        {
+            if (prev_sign != current_sign)
+            {
+              std::cout << "Vertices are not ordered for stvl!" << std::endl;
+              return false;
+            }
+        }
+    }
+    return true; // 所有连续的叉积符号一致，顶点按顺序排列
 }
 
 }  // namespace volume_grid

@@ -153,9 +153,12 @@ public:
   double CrossProduct(const geometry_msgs::msg::Point & first_point,
                       const geometry_msgs::msg::Point & second_point,
                       const geometry_msgs::msg::Point & point) const;
-  bool IsPointInRectangle(const geometry_msgs::msg::Point& diagonal_1,
-                          const geometry_msgs::msg::Point& diagonal_2,
+  bool IsPointInRectangle(const geometry_msgs::msg::Point& inside,
+                          const geometry_msgs::msg::Point& outside,
+                          const geometry_msgs::msg::Point& extend_outside,
+                          const geometry_msgs::msg::Point& extend_inside,
                           const geometry_msgs::msg::Point& point) const;
+  bool AreVerticesOrdered(const std::vector<geometry_msgs::msg::Point>& rectvertices);
 
 protected:
   // Initialize grid metadata and library

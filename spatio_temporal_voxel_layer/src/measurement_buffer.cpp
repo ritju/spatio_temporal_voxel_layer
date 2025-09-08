@@ -56,7 +56,9 @@ MeasurementBuffer::MeasurementBuffer(
   const double & min_obstacle_height, const double & max_obstacle_height,
   const double & obstacle_range, const double & min_obstacle_range,
   const double & cut_inside_x, const double & cut_inside_y, const double & cut_min_z,
-  const double & cut_extend_x, const double & cut_extend_y, const double & cut_max_z,
+  const double & cut_extend_inside_x, const double & cut_extend_inside_y,
+  const double & cut_extend_outside_x, const double & cut_extend_outside_y,
+  const double & cut_max_z,
   const double & cut_outside_x, const double & cut_outside_y,
   const std::string & cut_base_frame,
   const bool & enable_cut,
@@ -77,7 +79,9 @@ MeasurementBuffer::MeasurementBuffer(
   _topic_name(topic_name), _min_obstacle_height(min_obstacle_height),
   _max_obstacle_height(max_obstacle_height), _obstacle_range(obstacle_range), _min_obstacle_range(min_obstacle_range),
   _cut_inside_x(cut_inside_x), _cut_inside_y(cut_inside_y), _cut_min_z(cut_min_z),
-  _cut_extend_x(cut_extend_x), _cut_extend_y(cut_extend_y), _cut_max_z(cut_max_z),
+  _cut_extend_inside_x(cut_extend_inside_x), _cut_extend_inside_y(cut_extend_inside_y),
+  _cut_extend_outside_x(cut_extend_outside_x), _cut_extend_outside_y(cut_extend_outside_y),
+  _cut_max_z(cut_max_z),
   _cut_outside_x(cut_outside_x), _cut_outside_y(cut_outside_y),
   _cut_base_frame(cut_base_frame),
   _enable_cut(enable_cut),
@@ -159,21 +163,37 @@ void MeasurementBuffer::BufferROSCloud(
       tf2_ros::fromMsg(local_pose_outside.header.stamp), tf2::durationFromSec(0.5));
     _buffer.transform(local_pose_outside, global_pose_outside, _global_frame);
 
-    geometry_msgs::msg::PoseStamped local_pose_extend, global_pose_extend;
-    local_pose_extend.pose.position.x = _cut_extend_x;
-    local_pose_extend.pose.position.y = _cut_extend_y;
-    local_pose_extend.pose.position.z = 0;
-    local_pose_extend.pose.orientation.x = 0;
-    local_pose_extend.pose.orientation.y = 0;
-    local_pose_extend.pose.orientation.z = 0;
-    local_pose_extend.pose.orientation.w = 1;
-    local_pose_extend.header.stamp = cloud.header.stamp;
-    local_pose_extend.header.frame_id = _cut_base_frame;
+    geometry_msgs::msg::PoseStamped local_pose_extend_inside, global_pose_extend_inside;
+    local_pose_extend_inside.pose.position.x = _cut_extend_inside_x;
+    local_pose_extend_inside.pose.position.y = _cut_extend_inside_y;
+    local_pose_extend_inside.pose.position.z = 0;
+    local_pose_extend_inside.pose.orientation.x = 0;
+    local_pose_extend_inside.pose.orientation.y = 0;
+    local_pose_extend_inside.pose.orientation.z = 0;
+    local_pose_extend_inside.pose.orientation.w = 1;
+    local_pose_extend_inside.header.stamp = cloud.header.stamp;
+    local_pose_extend_inside.header.frame_id = _cut_base_frame;
 
     _buffer.canTransform(
-      _global_frame, local_pose_extend.header.frame_id,
-      tf2_ros::fromMsg(local_pose_extend.header.stamp), tf2::durationFromSec(0.5));
-    _buffer.transform(local_pose_extend, global_pose_extend, _global_frame);
+      _global_frame, local_pose_extend_inside.header.frame_id,
+      tf2_ros::fromMsg(local_pose_extend_inside.header.stamp), tf2::durationFromSec(0.5));
+    _buffer.transform(local_pose_extend_inside, global_pose_extend_inside, _global_frame);
+
+    geometry_msgs::msg::PoseStamped local_pose_extend_outside, global_pose_exten_outside;
+    local_pose_extend_outside.pose.position.x = _cut_extend_inside_x;
+    local_pose_extend_outside.pose.position.y = _cut_extend_inside_y;
+    local_pose_extend_outside.pose.position.z = 0;
+    local_pose_extend_outside.pose.orientation.x = 0;
+    local_pose_extend_outside.pose.orientation.y = 0;
+    local_pose_extend_outside.pose.orientation.z = 0;
+    local_pose_extend_outside.pose.orientation.w = 1;
+    local_pose_extend_outside.header.stamp = cloud.header.stamp;
+    local_pose_extend_outside.header.frame_id = _cut_base_frame;
+
+    _buffer.canTransform(
+      _global_frame, local_pose_extend_outside.header.frame_id,
+      tf2_ros::fromMsg(local_pose_extend_outside.header.stamp), tf2::durationFromSec(0.5));
+    _buffer.transform(local_pose_extend_outside, global_pose_exten_outside, _global_frame);
 
     _observation_list.front()._origin.x = global_pose.pose.position.x;
     _observation_list.front()._origin.y = global_pose.pose.position.y;
@@ -183,9 +203,13 @@ void MeasurementBuffer::BufferROSCloud(
     _observation_list.front()._cut_outside.y = global_pose_outside.pose.position.y;
     _observation_list.front()._cut_outside.z = global_pose_outside.pose.position.z;
 
-    _observation_list.front()._cut_extend.x = global_pose_extend.pose.position.x;
-    _observation_list.front()._cut_extend.y = global_pose_extend.pose.position.y;
-    _observation_list.front()._cut_extend.z = global_pose_extend.pose.position.z;
+    _observation_list.front()._cut_extend_inside.x = global_pose_extend_inside.pose.position.x;
+    _observation_list.front()._cut_extend_inside.y = global_pose_extend_inside.pose.position.y;
+    _observation_list.front()._cut_extend_inside.z = global_pose_extend_inside.pose.position.z;
+
+    _observation_list.front()._cut_extend_outside.x = global_pose_exten_outside.pose.position.x;
+    _observation_list.front()._cut_extend_outside.y = global_pose_exten_outside.pose.position.y;
+    _observation_list.front()._cut_extend_outside.z = global_pose_exten_outside.pose.position.z;
 
     _observation_list.front()._cut_inside.x = global_pose_inside.pose.position.x;
     _observation_list.front()._cut_inside.y = global_pose_inside.pose.position.y;
@@ -199,8 +223,10 @@ void MeasurementBuffer::BufferROSCloud(
     _observation_list.front()._cut_inside_x_in_m = _cut_inside_x;
     _observation_list.front()._cut_inside_y_in_m = _cut_inside_y;
     _observation_list.front()._cut_min_z_in_m = _cut_min_z;
-    _observation_list.front()._cut_extend_x_in_m = _cut_extend_x;
-    _observation_list.front()._cut_extend_y_in_m = _cut_extend_y;
+    _observation_list.front()._cut_extend_inside_x_in_m = _cut_extend_inside_x;
+    _observation_list.front()._cut_extend_inside_y_in_m = _cut_extend_inside_y;
+    _observation_list.front()._cut_extend_outside_x_in_m = _cut_extend_outside_x;
+    _observation_list.front()._cut_extend_outside_y_in_m = _cut_extend_outside_y;
     _observation_list.front()._cut_max_z_in_m = _cut_max_z;
     _observation_list.front()._cut_outside_x_in_m = _cut_outside_x;
     _observation_list.front()._cut_outside_y_in_m = _cut_outside_y;
@@ -222,54 +248,20 @@ void MeasurementBuffer::BufferROSCloud(
 
     // transform the cloud in the global frame
     point_cloud_ptr cld_global(new sensor_msgs::msg::PointCloud2());
-    // geometry_msgs::msg::TransformStamped tf_stamped =
-    //   _buffer.lookupTransform(
-    //   _global_frame, cloud.header.frame_id,
-    //   tf2_ros::fromMsg(cloud.header.stamp));
-    // tf2::doTransform(cloud, *cld_global, tf_stamped);
+    geometry_msgs::msg::TransformStamped tf_stamped =
+      _buffer.lookupTransform(
+      _global_frame, cloud.header.frame_id,
+      tf2_ros::fromMsg(cloud.header.stamp));
+    tf2::doTransform(cloud, *cld_global, tf_stamped);
 
-    // pcl::PCLPointCloud2::Ptr cloud_pcl(new pcl::PCLPointCloud2());
-    // pcl::PCLPointCloud2::Ptr cloud_filtered(new pcl::PCLPointCloud2());
-
-    // // remove points that are below or above our height restrictions, and
-    // // in the same time, remove NaNs and if user wants to use it, combine with a
-    // if (_filter == Filters::VOXEL) {
-    //   pcl_conversions::toPCL(*cld_global, *cloud_pcl);
-    //   pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
-    //   sor.setInputCloud(cloud_pcl);
-    //   sor.setFilterFieldName("z");
-    //   sor.setFilterLimits(_min_obstacle_height, _max_obstacle_height);
-    //   sor.setDownsampleAllData(false);
-    //   float v_s = static_cast<float>(_voxel_size);
-    //   sor.setLeafSize(v_s, v_s, v_s);
-    //   sor.setMinimumPointsNumberPerVoxel(static_cast<unsigned int>(_voxel_min_points));
-    //   sor.filter(*cloud_filtered);
-    //   pcl_conversions::fromPCL(*cloud_filtered, *cld_global);
-    // } else if (_filter == Filters::PASSTHROUGH) {
-    //   pcl_conversions::toPCL(*cld_global, *cloud_pcl);
-    //   pcl::PassThrough<pcl::PCLPointCloud2> pass_through_filter;
-    //   pass_through_filter.setInputCloud(cloud_pcl);
-    //   pass_through_filter.setKeepOrganized(false);
-    //   pass_through_filter.setFilterFieldName("z");
-    //   pass_through_filter.setFilterLimits(
-    //     _min_obstacle_height, _max_obstacle_height);
-    //   pass_through_filter.filter(*cloud_filtered);
-    //   pcl_conversions::fromPCL(*cloud_filtered, *cld_global);
-    // }
-
-    std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> cloud_pcl(new pcl::PointCloud<pcl::PointXYZ>());
-    std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>());
+    pcl::PCLPointCloud2::Ptr cloud_pcl(new pcl::PCLPointCloud2());
+    pcl::PCLPointCloud2::Ptr cloud_filtered(new pcl::PCLPointCloud2());
 
     // remove points that are below or above our height restrictions, and
     // in the same time, remove NaNs and if user wants to use it, combine with a
     if (_filter == Filters::VOXEL) {
-      geometry_msgs::msg::TransformStamped tf_stamped =
-      _buffer.lookupTransform(
-      _global_frame, cloud.header.frame_id,
-      tf2_ros::fromMsg(cloud.header.stamp));
-      tf2::doTransform(cloud, *cld_global, tf_stamped);
-      pcl::fromROSMsg(*cld_global, *cloud_pcl);
-      pcl::VoxelGrid<pcl::PointXYZ> sor;
+      pcl_conversions::toPCL(*cld_global, *cloud_pcl);
+      pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
       sor.setInputCloud(cloud_pcl);
       sor.setFilterFieldName("z");
       sor.setFilterLimits(_min_obstacle_height, _max_obstacle_height);
@@ -278,43 +270,17 @@ void MeasurementBuffer::BufferROSCloud(
       sor.setLeafSize(v_s, v_s, v_s);
       sor.setMinimumPointsNumberPerVoxel(static_cast<unsigned int>(_voxel_min_points));
       sor.filter(*cloud_filtered);
-      pcl::toROSMsg(*cloud_filtered, *cld_global);
+      pcl_conversions::fromPCL(*cloud_filtered, *cld_global);
     } else if (_filter == Filters::PASSTHROUGH) {
-      std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> cloud_filtered_in_base_footprint(new pcl::PointCloud<pcl::PointXYZ>);
-      point_cloud_ptr cld_global_in_base_footprint(new sensor_msgs::msg::PointCloud2());
-      geometry_msgs::msg::TransformStamped tf_stamped_to_base_footprint =
-      _buffer.lookupTransform(
-      "base_footprint", cloud.header.frame_id,
-      tf2_ros::fromMsg(cloud.header.stamp));
-      tf2::doTransform(cloud, *cld_global_in_base_footprint, tf_stamped_to_base_footprint);
-      pcl::fromROSMsg(*cld_global_in_base_footprint, *cloud_pcl);
-      pcl::PassThrough<pcl::PointXYZ> pass_through_filter;
+      pcl_conversions::toPCL(*cld_global, *cloud_pcl);
+      pcl::PassThrough<pcl::PCLPointCloud2> pass_through_filter;
       pass_through_filter.setInputCloud(cloud_pcl);
       pass_through_filter.setKeepOrganized(false);
       pass_through_filter.setFilterFieldName("z");
       pass_through_filter.setFilterLimits(
         _min_obstacle_height, _max_obstacle_height);
-      pass_through_filter.filter(*cloud_filtered_in_base_footprint);
-
-      pass_through_filter.setInputCloud(cloud_filtered_in_base_footprint);
-      pass_through_filter.setKeepOrganized(false);
-      pass_through_filter.setFilterFieldName("y");
-      if (_cut_inside_y < _cut_extend_y)
-      {
-        pass_through_filter.setFilterLimits(_cut_inside_y, _cut_extend_y);
-      } else {
-        pass_through_filter.setFilterLimits(_cut_extend_y, _cut_inside_y);
-      }
-      pass_through_filter.filter(*cloud_filtered_in_base_footprint);
-      geometry_msgs::msg::TransformStamped tf_stamped =
-      _buffer.lookupTransform(
-      _global_frame, "base_footprint",
-      tf2_ros::fromMsg(cloud.header.stamp));
-      Eigen::Affine3f latest_transform = Eigen::Affine3f::Identity();
-      latest_transform = tf2::transformToEigen(tf_stamped).cast<float>();
-      pcl::transformPointCloud<pcl::PointXYZ>(*cloud_filtered_in_base_footprint, *cloud_filtered, latest_transform);
-      
-      pcl::toROSMsg(*cloud_filtered, *cld_global);
+      pass_through_filter.filter(*cloud_filtered);
+      pcl_conversions::fromPCL(*cloud_filtered, *cld_global);
     }
 
     _observation_list.front()._cloud.reset(cld_global.release());

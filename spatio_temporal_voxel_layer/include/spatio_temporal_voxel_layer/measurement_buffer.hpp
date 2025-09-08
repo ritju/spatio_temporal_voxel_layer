@@ -96,8 +96,10 @@ public:
     const double & cut_inside_x,
     const double & cut_inside_y,
     const double & cut_min_z,
-    const double & cut_extend_x,
-    const double & cut_extend_y,
+    const double & cut_extend_inside_x,
+    const double & cut_extend_inside_y,
+    const double & cut_extend_outside_x,
+    const double & cut_extend_outside_y,
     const double & cut_max_z,
     const double & cut_outside_x,
     const double & cut_outside_y,
@@ -169,7 +171,7 @@ private:
   std::string _global_frame, _sensor_frame, _source_name, _topic_name;
   std::list<observation::MeasurementReading> _observation_list;
   double _min_obstacle_height, _max_obstacle_height, _obstacle_range, _min_obstacle_range, _tf_tolerance;
-  double _cut_inside_x, _cut_inside_y, _cut_min_z, _cut_extend_x, _cut_extend_y, _cut_max_z, _cut_outside_x, _cut_outside_y;
+  double _cut_inside_x, _cut_inside_y, _cut_min_z, _cut_extend_inside_x, _cut_extend_inside_y, _cut_extend_outside_x, _cut_extend_outside_y, _cut_max_z, _cut_outside_x, _cut_outside_y;
   bool _enable_cut;
   std::string _cut_base_frame;
   double _min_z, _max_z, _vertical_fov, _vertical_fov_padding, _horizontal_fov;

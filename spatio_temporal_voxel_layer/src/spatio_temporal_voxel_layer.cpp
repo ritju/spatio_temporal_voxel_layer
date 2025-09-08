@@ -169,7 +169,7 @@ void SpatioTemporalVoxelLayer::onInitialize(void)
     double observation_keep_time, expected_update_rate, min_obstacle_height, max_obstacle_height;
     double min_z, max_z, vFOV, vFOVPadding;
     double hFOV, decay_acceleration, obstacle_range, min_obstacle_range;
-    double cut_inside_x, cut_inside_y, cut_min_z, cut_extend_x, cut_extend_y, cut_max_z;
+    double cut_inside_x, cut_inside_y, cut_min_z, cut_extend_inside_x, cut_extend_inside_y, cut_extend_outside_x, cut_extend_outside_y, cut_max_z;
     double cut_outside_x, cut_outside_y;
     std::string cut_base_frame;
     bool enable_cut;
@@ -196,8 +196,10 @@ void SpatioTemporalVoxelLayer::onInitialize(void)
     declareParameter(source + "." + "cut_inside_x", rclcpp::ParameterValue(0.0));
     declareParameter(source + "." + "cut_inside_y", rclcpp::ParameterValue(0.0));
     declareParameter(source + "." + "cut_min_z", rclcpp::ParameterValue(0.0));
-    declareParameter(source + "." + "cut_extend_x", rclcpp::ParameterValue(0.0));
-    declareParameter(source + "." + "cut_extend_y", rclcpp::ParameterValue(0.0));
+    declareParameter(source + "." + "cut_extend_inside_x", rclcpp::ParameterValue(0.0));
+    declareParameter(source + "." + "cut_extend_inside_y", rclcpp::ParameterValue(0.0));
+    declareParameter(source + "." + "cut_extend_outside_x", rclcpp::ParameterValue(0.0));
+    declareParameter(source + "." + "cut_extend_outside_y", rclcpp::ParameterValue(0.0));
     declareParameter(source + "." + "cut_max_z", rclcpp::ParameterValue(0.0));
     declareParameter(source + "." + "enable_cut", rclcpp::ParameterValue(false));
     declareParameter(source + "." + "cut_outside_x", rclcpp::ParameterValue(0.0));
@@ -236,8 +238,10 @@ void SpatioTemporalVoxelLayer::onInitialize(void)
     node->get_parameter(name_ + "." + source + "." + "cut_inside_x", cut_inside_x);
     node->get_parameter(name_ + "." + source + "." + "cut_inside_y", cut_inside_y);
     node->get_parameter(name_ + "." + source + "." + "cut_min_z", cut_min_z);
-    node->get_parameter(name_ + "." + source + "." + "cut_extend_x", cut_extend_x);
-    node->get_parameter(name_ + "." + source + "." + "cut_extend_y", cut_extend_y);
+    node->get_parameter(name_ + "." + source + "." + "cut_extend_inside_x", cut_extend_inside_x);
+    node->get_parameter(name_ + "." + source + "." + "cut_extend_inside_y", cut_extend_inside_y);
+    node->get_parameter(name_ + "." + source + "." + "cut_extend_outside_x", cut_extend_outside_x);
+    node->get_parameter(name_ + "." + source + "." + "cut_extend_outside_y", cut_extend_outside_y);
     node->get_parameter(name_ + "." + source + "." + "cut_max_z", cut_max_z);
     node->get_parameter(name_ + "." + source + "." + "enable_cut", enable_cut);
     node->get_parameter(name_ + "." + source + "." + "cut_outside_x", cut_outside_x);
@@ -294,7 +298,9 @@ void SpatioTemporalVoxelLayer::onInitialize(void)
           observation_keep_time, expected_update_rate, min_obstacle_height,
           max_obstacle_height, obstacle_range, min_obstacle_range,
           cut_inside_x, cut_inside_y, cut_min_z,
-          cut_extend_x, cut_extend_y, cut_max_z, 
+          cut_extend_inside_x, cut_extend_inside_y,
+          cut_extend_outside_x, cut_extend_outside_y,
+          cut_max_z, 
           cut_outside_x, cut_outside_y,
           cut_base_frame,
           enable_cut,
