@@ -179,9 +179,9 @@ void MeasurementBuffer::BufferROSCloud(
       tf2_ros::fromMsg(local_pose_extend_inside.header.stamp), tf2::durationFromSec(0.5));
     _buffer.transform(local_pose_extend_inside, global_pose_extend_inside, _global_frame);
 
-    geometry_msgs::msg::PoseStamped local_pose_extend_outside, global_pose_exten_outside;
-    local_pose_extend_outside.pose.position.x = _cut_extend_inside_x;
-    local_pose_extend_outside.pose.position.y = _cut_extend_inside_y;
+    geometry_msgs::msg::PoseStamped local_pose_extend_outside, global_pose_extend_outside;
+    local_pose_extend_outside.pose.position.x = _cut_extend_outside_x;
+    local_pose_extend_outside.pose.position.y = _cut_extend_outside_y;
     local_pose_extend_outside.pose.position.z = 0;
     local_pose_extend_outside.pose.orientation.x = 0;
     local_pose_extend_outside.pose.orientation.y = 0;
@@ -193,7 +193,7 @@ void MeasurementBuffer::BufferROSCloud(
     _buffer.canTransform(
       _global_frame, local_pose_extend_outside.header.frame_id,
       tf2_ros::fromMsg(local_pose_extend_outside.header.stamp), tf2::durationFromSec(0.5));
-    _buffer.transform(local_pose_extend_outside, global_pose_exten_outside, _global_frame);
+    _buffer.transform(local_pose_extend_outside, global_pose_extend_outside, _global_frame);
 
     _observation_list.front()._origin.x = global_pose.pose.position.x;
     _observation_list.front()._origin.y = global_pose.pose.position.y;
@@ -207,9 +207,9 @@ void MeasurementBuffer::BufferROSCloud(
     _observation_list.front()._cut_extend_inside.y = global_pose_extend_inside.pose.position.y;
     _observation_list.front()._cut_extend_inside.z = global_pose_extend_inside.pose.position.z;
 
-    _observation_list.front()._cut_extend_outside.x = global_pose_exten_outside.pose.position.x;
-    _observation_list.front()._cut_extend_outside.y = global_pose_exten_outside.pose.position.y;
-    _observation_list.front()._cut_extend_outside.z = global_pose_exten_outside.pose.position.z;
+    _observation_list.front()._cut_extend_outside.x = global_pose_extend_outside.pose.position.x;
+    _observation_list.front()._cut_extend_outside.y = global_pose_extend_outside.pose.position.y;
+    _observation_list.front()._cut_extend_outside.z = global_pose_extend_outside.pose.position.z;
 
     _observation_list.front()._cut_inside.x = global_pose_inside.pose.position.x;
     _observation_list.front()._cut_inside.y = global_pose_inside.pose.position.y;
