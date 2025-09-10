@@ -74,6 +74,7 @@
 // Mutex and locks
 #include "boost/thread.hpp"
 #include "boost/thread/recursive_mutex.hpp"
+#include "rclcpp/publisher.hpp"
 
 namespace volume_grid
 {

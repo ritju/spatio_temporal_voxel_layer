@@ -78,6 +78,12 @@ struct MeasurementReading
     double cut_extend_outside_x, double cut_extend_outside_y,
     double cut_max_z,
     bool enable_cut,
+    bool enable_ground_segment,
+    bool debug_mode,
+    std::string ground_topic,
+    std::string obstacle_topic,
+    double ground_segment_distance_threshold,
+    int max_iterations,
     double cut_outside_x, double cut_outside_y,
     std::string cut_base_frame,
     double min_z, double max_z, double vFOV,
@@ -103,6 +109,12 @@ struct MeasurementReading
     _cut_extend_outside_y_in_m(cut_extend_outside_y),
     _cut_max_z_in_m(cut_max_z),
     _enable_cut(enable_cut),
+    _enable_ground_segment(enable_ground_segment),
+    _debug_mode(debug_mode),
+    _ground_topic(ground_topic),
+    _obstacle_topic(obstacle_topic),
+    _ground_segment_distance_threshold(ground_segment_distance_threshold),
+    _max_iterations(max_iterations),
     _cut_outside_x_in_m(cut_outside_x),
     _cut_outside_y_in_m(cut_outside_y),
     _cut_base_frame(cut_base_frame),
@@ -147,6 +159,12 @@ struct MeasurementReading
     _cut_extend_outside_y_in_m(obs._cut_extend_outside_y_in_m),
     _cut_max_z_in_m(obs._cut_max_z_in_m),
     _enable_cut(obs._enable_cut),
+    _enable_ground_segment(obs._enable_ground_segment),
+    _debug_mode(obs._debug_mode),
+    _ground_topic(obs._ground_topic),
+    _obstacle_topic(obs._obstacle_topic),
+    _ground_segment_distance_threshold(obs._ground_segment_distance_threshold),
+    _max_iterations(obs._max_iterations),
     _cut_outside_x_in_m(obs._cut_outside_x_in_m),
     _cut_outside_y_in_m(obs._cut_outside_y_in_m),
     _cut_base_frame(obs._cut_base_frame),
@@ -166,7 +184,10 @@ struct MeasurementReading
   double _obstacle_range_in_m, _min_obstacle_range_in_m, _min_z_in_m, _max_z_in_m;
   double _cut_inside_x_in_m, _cut_inside_y_in_m, _cut_min_z_in_m;
   double _cut_extend_inside_x_in_m, _cut_extend_inside_y_in_m, _cut_extend_outside_x_in_m, _cut_extend_outside_y_in_m, _cut_max_z_in_m;
-  bool _enable_cut;
+  bool _enable_cut, _enable_ground_segment, _debug_mode;
+  std::string _ground_topic, _obstacle_topic;
+  double _ground_segment_distance_threshold;
+  int _max_iterations;
   double _cut_outside_x_in_m, _cut_outside_y_in_m;
   std::string _cut_base_frame;
   double _vertical_fov_in_rad, _vertical_fov_padding_in_m, _horizontal_fov_in_rad;

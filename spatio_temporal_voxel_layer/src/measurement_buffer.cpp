@@ -62,6 +62,12 @@ MeasurementBuffer::MeasurementBuffer(
   const double & cut_outside_x, const double & cut_outside_y,
   const std::string & cut_base_frame,
   const bool & enable_cut,
+  const bool & enable_ground_segment,
+  const bool & debug_mode,
+  const std::string & ground_topic,
+  const std::string & obstacle_topic,
+  const double & ground_segment_distance_threshold,
+  const int & max_iterations,
   tf2_ros::Buffer & tf, const std::string & global_frame,
   const std::string & sensor_frame, const double & tf_tolerance,
   const double & min_d, const double & max_d, const double & vFOV,
@@ -85,6 +91,12 @@ MeasurementBuffer::MeasurementBuffer(
   _cut_outside_x(cut_outside_x), _cut_outside_y(cut_outside_y),
   _cut_base_frame(cut_base_frame),
   _enable_cut(enable_cut),
+  _enable_ground_segment(enable_ground_segment),
+  _debug_mode(debug_mode),
+  _ground_topic(ground_topic),
+  _obstacle_topic(obstacle_topic),
+  _ground_segment_distance_threshold(ground_segment_distance_threshold),
+  _max_iterations(max_iterations),
   _tf_tolerance(tf_tolerance), _min_z(min_d), _max_z(max_d),
   _vertical_fov(vFOV), _vertical_fov_padding(vFOVPadding),
   _horizontal_fov(hFOV), _decay_acceleration(decay_acceleration),
@@ -94,6 +106,18 @@ MeasurementBuffer::MeasurementBuffer(
   _enabled(enabled), _model_type(model_type), clock_(clock), logger_(logger)
 /*****************************************************************************/
 {
+  if (debug_mode)
+  {
+    node_ = rclcpp::Node::make_shared("measurement_buffer_debug_node");
+    ground_publisher_ = node_->create_publisher<sensor_msgs::msg::PointCloud2>(ground_topic, 1);
+    obstacle_publisher_ = node_->create_publisher<sensor_msgs::msg::PointCloud2>(obstacle_topic, 1);
+  }
+  else
+  {
+    node_ = nullptr;
+    ground_publisher_ = nullptr;
+    obstacle_publisher_ = nullptr;
+  }
 }
 
 /*****************************************************************************/
@@ -232,6 +256,12 @@ void MeasurementBuffer::BufferROSCloud(
     _observation_list.front()._cut_outside_y_in_m = _cut_outside_y;
     _observation_list.front()._cut_base_frame = _cut_base_frame;
     _observation_list.front()._enable_cut = _enable_cut;
+    _observation_list.front()._enable_ground_segment = _enable_ground_segment;
+    _observation_list.front()._debug_mode = _debug_mode;
+    _observation_list.front()._ground_topic = _ground_topic;
+    _observation_list.front()._obstacle_topic = _obstacle_topic;
+    _observation_list.front()._ground_segment_distance_threshold = _ground_segment_distance_threshold;
+    _observation_list.front()._max_iterations = _max_iterations;
     _observation_list.front()._vertical_fov_in_rad = _vertical_fov;
     _observation_list.front()._vertical_fov_padding_in_m =
       _vertical_fov_padding;
@@ -254,35 +284,181 @@ void MeasurementBuffer::BufferROSCloud(
       tf2_ros::fromMsg(cloud.header.stamp));
     tf2::doTransform(cloud, *cld_global, tf_stamped);
 
-    pcl::PCLPointCloud2::Ptr cloud_pcl(new pcl::PCLPointCloud2());
-    pcl::PCLPointCloud2::Ptr cloud_filtered(new pcl::PCLPointCloud2());
-
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_pcl(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>);
     // remove points that are below or above our height restrictions, and
     // in the same time, remove NaNs and if user wants to use it, combine with a
     if (_filter == Filters::VOXEL) {
-      pcl_conversions::toPCL(*cld_global, *cloud_pcl);
-      pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
-      sor.setInputCloud(cloud_pcl);
-      sor.setFilterFieldName("z");
-      sor.setFilterLimits(_min_obstacle_height, _max_obstacle_height);
-      sor.setDownsampleAllData(false);
-      float v_s = static_cast<float>(_voxel_size);
-      sor.setLeafSize(v_s, v_s, v_s);
-      sor.setMinimumPointsNumberPerVoxel(static_cast<unsigned int>(_voxel_min_points));
-      sor.filter(*cloud_filtered);
-      pcl_conversions::fromPCL(*cloud_filtered, *cld_global);
-    } else if (_filter == Filters::PASSTHROUGH) {
-      pcl_conversions::toPCL(*cld_global, *cloud_pcl);
-      pcl::PassThrough<pcl::PCLPointCloud2> pass_through_filter;
-      pass_through_filter.setInputCloud(cloud_pcl);
-      pass_through_filter.setKeepOrganized(false);
-      pass_through_filter.setFilterFieldName("z");
-      pass_through_filter.setFilterLimits(
-        _min_obstacle_height, _max_obstacle_height);
-      pass_through_filter.filter(*cloud_filtered);
-      pcl_conversions::fromPCL(*cloud_filtered, *cld_global);
-    }
+      pcl::fromROSMsg(*cld_global, *cloud_pcl);
+      
+      // 分割地面和障碍物
+      if (_enable_ground_segment)
+      {
+        pcl::SACSegmentation<pcl::PointXYZ> seg;
+        pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
+        pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
 
+        // 设置分割参数
+        seg.setOptimizeCoefficients(true);
+        seg.setModelType(pcl::SACMODEL_PLANE);
+        seg.setMethodType(pcl::SAC_RANSAC);
+        seg.setMaxIterations(_max_iterations);
+        seg.setDistanceThreshold(_ground_segment_distance_threshold);
+        seg.setInputCloud(cloud_pcl);
+
+        // 执行分割
+        seg.segment(*inliers, *coefficients);
+
+        // 检查是否成功分割到平面
+        if (inliers->indices.empty()) {
+          RCLCPP_WARN_STREAM_THROTTLE(logger_, *clock_, 5000, "Could not estimate a planar model for the given dataset");
+          pcl::VoxelGrid<pcl::PointXYZ> sor;
+          sor.setInputCloud(cloud_pcl);
+          sor.setFilterFieldName("z");
+          sor.setFilterLimits(_min_obstacle_height, _max_obstacle_height);
+          sor.setDownsampleAllData(false);
+          float v_s = static_cast<float>(_voxel_size);
+          sor.setLeafSize(v_s, v_s, v_s);
+          sor.setMinimumPointsNumberPerVoxel(static_cast<unsigned int>(_voxel_min_points));
+          sor.filter(*cloud_filtered);
+          pcl::toROSMsg(*cloud_filtered, *cld_global);
+        } else {
+          // 提取地面点云（分割出的平面）
+          pcl::ExtractIndices<pcl::PointXYZ> extract;
+          extract.setInputCloud(cloud_pcl);
+          extract.setIndices(inliers);
+
+          // 将地面点云转换回ROS消息并发布
+          if (_debug_mode && ground_publisher_ != nullptr) {
+            pcl::PointCloud<pcl::PointXYZ>::Ptr ground_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+            extract.setNegative(false); // 提取内点（地面）
+            extract.filter(*ground_cloud);
+            sensor_msgs::msg::PointCloud2 ground_msg;
+            pcl::toROSMsg(*ground_cloud, ground_msg);
+            ground_msg.header = cld_global->header;
+            ground_publisher_->publish(ground_msg);
+          }
+
+          // 提取非地面点云
+          pcl::PointCloud<pcl::PointXYZ>::Ptr non_ground_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+          extract.setNegative(true); // 提取外点（非地面）
+          extract.filter(*non_ground_cloud);
+
+          // 将非地面点云转换回ROS消息并发布
+          if (_debug_mode && obstacle_publisher_ != nullptr) {
+            sensor_msgs::msg::PointCloud2 non_ground_msg;
+            pcl::toROSMsg(*non_ground_cloud, non_ground_msg);
+            non_ground_msg.header = cld_global->header;
+            obstacle_publisher_->publish(non_ground_msg);
+          }
+
+          pcl::VoxelGrid<pcl::PointXYZ> sor;
+          sor.setInputCloud(non_ground_cloud);
+          sor.setFilterFieldName("z");
+          sor.setFilterLimits(_min_obstacle_height, _max_obstacle_height);
+          sor.setDownsampleAllData(false);
+          float v_s = static_cast<float>(_voxel_size);
+          sor.setLeafSize(v_s, v_s, v_s);
+          sor.setMinimumPointsNumberPerVoxel(static_cast<unsigned int>(_voxel_min_points));
+          sor.filter(*cloud_filtered);
+          pcl::toROSMsg(*cloud_filtered, *cld_global);
+        }
+      }
+      else
+      {
+        pcl::VoxelGrid<pcl::PointXYZ> sor;
+        sor.setInputCloud(cloud_pcl);
+        sor.setFilterFieldName("z");
+        sor.setFilterLimits(_min_obstacle_height, _max_obstacle_height);
+        sor.setDownsampleAllData(false);
+        float v_s = static_cast<float>(_voxel_size);
+        sor.setLeafSize(v_s, v_s, v_s);
+        sor.setMinimumPointsNumberPerVoxel(static_cast<unsigned int>(_voxel_min_points));
+        sor.filter(*cloud_filtered);
+        pcl::toROSMsg(*cloud_filtered, *cld_global);
+      }
+    } else if (_filter == Filters::PASSTHROUGH) {
+      pcl::fromROSMsg(*cld_global, *cloud_pcl);
+      if (_enable_ground_segment)
+      {
+        pcl::SACSegmentation<pcl::PointXYZ> seg;
+        pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
+        pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
+
+        // 设置分割参数
+        seg.setOptimizeCoefficients(true);
+        seg.setModelType(pcl::SACMODEL_PLANE);
+        seg.setMethodType(pcl::SAC_RANSAC);
+        seg.setMaxIterations(_max_iterations);
+        seg.setDistanceThreshold(_ground_segment_distance_threshold);
+        seg.setInputCloud(cloud_pcl);
+
+        // 执行分割
+        seg.segment(*inliers, *coefficients);
+
+        // 检查是否成功分割到平面
+        if (inliers->indices.empty()) {
+          RCLCPP_WARN_STREAM_THROTTLE(logger_, *clock_, 5000, "Could not estimate a planar model for the given dataset");
+          pcl::PassThrough<pcl::PointXYZ> pass_through_filter;
+          pass_through_filter.setInputCloud(cloud_pcl);
+          pass_through_filter.setKeepOrganized(false);
+          pass_through_filter.setFilterFieldName("z");
+          pass_through_filter.setFilterLimits(
+            _min_obstacle_height, _max_obstacle_height);
+          pass_through_filter.filter(*cloud_filtered);
+          pcl::toROSMsg(*cloud_filtered, *cld_global);
+        } else {
+          // 提取地面点云（分割出的平面）
+          pcl::ExtractIndices<pcl::PointXYZ> extract;
+          extract.setInputCloud(cloud_pcl);
+          extract.setIndices(inliers);
+
+          // 将地面点云转换回ROS消息并发布
+          if (_debug_mode && ground_publisher_ != nullptr) {
+            pcl::PointCloud<pcl::PointXYZ>::Ptr ground_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+            extract.setNegative(false); // 提取内点（地面）
+            extract.filter(*ground_cloud);
+            sensor_msgs::msg::PointCloud2 ground_msg;
+            pcl::toROSMsg(*ground_cloud, ground_msg);
+            ground_msg.header = cld_global->header;
+            ground_publisher_->publish(ground_msg);
+          }
+
+          // 提取非地面点云
+          pcl::PointCloud<pcl::PointXYZ>::Ptr non_ground_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+          extract.setNegative(true); // 提取外点（非地面）
+          extract.filter(*non_ground_cloud);
+
+          // 将非地面点云转换回ROS消息并发布
+          if (_debug_mode && obstacle_publisher_ != nullptr) {
+            sensor_msgs::msg::PointCloud2 non_ground_msg;
+            pcl::toROSMsg(*non_ground_cloud, non_ground_msg);
+            non_ground_msg.header = cld_global->header;
+            obstacle_publisher_->publish(non_ground_msg);
+          }
+
+          pcl::PassThrough<pcl::PointXYZ> pass_through_filter;
+          pass_through_filter.setInputCloud(non_ground_cloud);
+          pass_through_filter.setKeepOrganized(false);
+          pass_through_filter.setFilterFieldName("z");
+          pass_through_filter.setFilterLimits(
+            _min_obstacle_height, _max_obstacle_height);
+          pass_through_filter.filter(*cloud_filtered);
+          pcl::toROSMsg(*cloud_filtered, *cld_global);
+        }
+      }
+      else
+      {
+        pcl::PassThrough<pcl::PointXYZ> pass_through_filter;
+        pass_through_filter.setInputCloud(cloud_pcl);
+        pass_through_filter.setKeepOrganized(false);
+        pass_through_filter.setFilterFieldName("z");
+        pass_through_filter.setFilterLimits(
+          _min_obstacle_height, _max_obstacle_height);
+        pass_through_filter.filter(*cloud_filtered);
+        pcl::toROSMsg(*cloud_filtered, *cld_global);
+      }
+    }
     _observation_list.front()._cloud.reset(cld_global.release());
   } catch (tf2::TransformException & ex) {
     // if fails, remove the empty observation

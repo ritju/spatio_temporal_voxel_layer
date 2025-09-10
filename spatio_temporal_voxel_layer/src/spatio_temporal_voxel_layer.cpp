@@ -172,7 +172,10 @@ void SpatioTemporalVoxelLayer::onInitialize(void)
     double cut_inside_x, cut_inside_y, cut_min_z, cut_extend_inside_x, cut_extend_inside_y, cut_extend_outside_x, cut_extend_outside_y, cut_max_z;
     double cut_outside_x, cut_outside_y;
     std::string cut_base_frame;
-    bool enable_cut;
+    bool enable_cut, enable_ground_segment, debug_mode;
+    std::string ground_topic, obstacle_topic;
+    double ground_segment_distance_threshold;
+    int max_iterations;
     std::string topic, sensor_frame, data_type, filter_str;
     bool inf_is_valid = false, clearing, marking;
     bool clear_after_reading, enabled;
@@ -202,6 +205,12 @@ void SpatioTemporalVoxelLayer::onInitialize(void)
     declareParameter(source + "." + "cut_extend_outside_y", rclcpp::ParameterValue(0.0));
     declareParameter(source + "." + "cut_max_z", rclcpp::ParameterValue(0.0));
     declareParameter(source + "." + "enable_cut", rclcpp::ParameterValue(false));
+    declareParameter(source + "." + "enable_ground_segment", rclcpp::ParameterValue(false));
+    declareParameter(source + "." + "debug_mode", rclcpp::ParameterValue(false));
+    declareParameter(source + "." + "ground_topic", rclcpp::ParameterValue(std::string("ground_points")));
+    declareParameter(source + "." + "obstacle_topic", rclcpp::ParameterValue(std::string("obstacle_points")));
+    declareParameter(source + "." + "ground_segment_distance_threshold", rclcpp::ParameterValue(0.05));
+    declareParameter(source + "." + "max_iterations", rclcpp::ParameterValue(1000));
     declareParameter(source + "." + "cut_outside_x", rclcpp::ParameterValue(0.0));
     declareParameter(source + "." + "cut_outside_y", rclcpp::ParameterValue(0.0));
     declareParameter(source + "." + "cut_base_frame", rclcpp::ParameterValue(std::string("base_footprint")));
@@ -244,6 +253,12 @@ void SpatioTemporalVoxelLayer::onInitialize(void)
     node->get_parameter(name_ + "." + source + "." + "cut_extend_outside_y", cut_extend_outside_y);
     node->get_parameter(name_ + "." + source + "." + "cut_max_z", cut_max_z);
     node->get_parameter(name_ + "." + source + "." + "enable_cut", enable_cut);
+    node->get_parameter(name_ + "." + source + "." + "enable_ground_segment", enable_ground_segment);
+    node->get_parameter(name_ + "." + source + "." + "debug_mode", debug_mode);
+    node->get_parameter(name_ + "." + source + "." + "ground_topic", ground_topic);
+    node->get_parameter(name_ + "." + source + "." + "obstacle_topic", obstacle_topic);
+    node->get_parameter(name_ + "." + source + "." + "ground_segment_distance_threshold", ground_segment_distance_threshold);
+    node->get_parameter(name_ + "." + source + "." + "max_iterations", max_iterations);
     node->get_parameter(name_ + "." + source + "." + "cut_outside_x", cut_outside_x);
     node->get_parameter(name_ + "." + source + "." + "cut_outside_y", cut_outside_y);
     node->get_parameter(name_ + "." + source + "." + "cut_base_frame", cut_base_frame);
@@ -304,6 +319,12 @@ void SpatioTemporalVoxelLayer::onInitialize(void)
           cut_outside_x, cut_outside_y,
           cut_base_frame,
           enable_cut,
+          enable_ground_segment,
+          debug_mode,
+          ground_topic,
+          obstacle_topic,
+          ground_segment_distance_threshold,
+          max_iterations,
           *tf_, _global_frame, sensor_frame,
           transform_tolerance, min_z, max_z, vFOV, vFOVPadding, hFOV,
           decay_acceleration, marking, clearing, _voxel_size,

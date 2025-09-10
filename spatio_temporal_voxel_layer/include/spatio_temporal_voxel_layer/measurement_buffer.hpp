@@ -65,6 +65,12 @@
 #include "geometry_msgs/msg/transform_stamped.hpp"
 // Mutex
 #include "boost/thread.hpp"
+#include <pcl/point_types.h>
+#include <pcl/point_cloud.h>
+#include <pcl/filters/extract_indices.h>
+#include <pcl/segmentation/sac_segmentation.h>
+#include <pcl/sample_consensus/method_types.h>
+#include <pcl/sample_consensus/model_types.h>
 
 namespace buffer
 {
@@ -105,6 +111,12 @@ public:
     const double & cut_outside_y,
     const std::string & cut_base_frame,
     const bool & enable_cut,
+    const bool & enable_ground_segment,
+    const bool & debug_mode,
+    const std::string & ground_topic,
+    const std::string & obstacle_topic,
+    const double & ground_segment_distance_threshold,
+    const int & max_iterations,
     tf2_ros::Buffer & tf,
     const std::string & global_frame,
     const std::string & sensor_frame,
@@ -172,7 +184,11 @@ private:
   std::list<observation::MeasurementReading> _observation_list;
   double _min_obstacle_height, _max_obstacle_height, _obstacle_range, _min_obstacle_range, _tf_tolerance;
   double _cut_inside_x, _cut_inside_y, _cut_min_z, _cut_extend_inside_x, _cut_extend_inside_y, _cut_extend_outside_x, _cut_extend_outside_y, _cut_max_z, _cut_outside_x, _cut_outside_y;
-  bool _enable_cut;
+  bool _enable_cut, _enable_ground_segment, _debug_mode;
+  std::string _ground_topic, _obstacle_topic;
+  double _ground_segment_distance_threshold;
+  int _max_iterations;
+
   std::string _cut_base_frame;
   double _min_z, _max_z, _vertical_fov, _vertical_fov_padding, _horizontal_fov;
   double _decay_acceleration, _voxel_size;
@@ -183,6 +199,9 @@ private:
   ModelType _model_type;
   rclcpp::Clock::SharedPtr clock_;
   rclcpp::Logger logger_;
+  std::shared_ptr<rclcpp::Node> node_;
+  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr ground_publisher_;
+  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr obstacle_publisher_;
 };
 
 }  // namespace buffer

@@ -281,7 +281,6 @@ void SpatioTemporalVoxelGrid::operator()(
     sensor_msgs::PointCloud2ConstIterator<float> iter_x(cloud, "x");
     sensor_msgs::PointCloud2ConstIterator<float> iter_y(cloud, "y");
     sensor_msgs::PointCloud2ConstIterator<float> iter_z(cloud, "z");
-
     for (; iter_x != iter_x.end();
       ++iter_x, ++iter_y, ++iter_z)
     {
@@ -316,6 +315,9 @@ void SpatioTemporalVoxelGrid::operator()(
             mark_grid[0], mark_grid[1],
             mark_grid[2]), cur_time))
       {
+        RCLCPP_WARN(
+          rclcpp::get_logger("SpatioTemporalVoxelGrid"),
+          "Failed to mark point.");
         std::cout << "Failed to mark point." << std::endl;
       }
     }
