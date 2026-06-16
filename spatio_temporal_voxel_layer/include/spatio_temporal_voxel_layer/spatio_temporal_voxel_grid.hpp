@@ -50,6 +50,7 @@
 #include <vector>
 #include <memory>
 #include <string>
+#include <atomic>
 // PCL
 #include "pcl/common/transforms.h"
 #include "pcl/PCLPointCloud2.h"
@@ -62,6 +63,8 @@
 #include "visualization_msgs/msg/marker.hpp"
 #include "geometry_msgs/msg/point.hpp"
 #include "geometry_msgs/msg/point32.hpp"
+#include "geometry_msgs/msg/polygon_stamped.hpp"
+#include "nav_msgs/msg/path.hpp"
 // OpenVDB
 #include "openvdb/openvdb.h"
 #include "openvdb/tools/GridTransformer.h"
@@ -88,12 +91,11 @@ enum GlobalDecayModel
 // Structure for an occupied cell for map
 struct occupany_cell
 {
-  occupany_cell(const double & _x, const double & _y)
-  : x(_x), y(_y)
+  occupany_cell(const double& _x, const double& _y) : x(_x), y(_y)
   {
   }
 
-  bool operator==(const occupany_cell & other) const
+  bool operator==(const occupany_cell& other) const
   {
     return x == other.x && y == other.y;
   }
@@ -104,17 +106,17 @@ struct occupany_cell
 // Structure for wrapping frustum model and necessary metadata
 struct frustum_model
 {
-  frustum_model(geometry::Frustum * _frustum, const double & _factor)
-  : frustum(_frustum), accel_factor(_factor)
+  frustum_model(geometry::Frustum* _frustum, const double& _factor) : frustum(_frustum), accel_factor(_factor)
   {
   }
   ~frustum_model()
   {
-    if (frustum) {
+    if (frustum)
+    {
       delete frustum;
     }
   }
-  geometry::Frustum * frustum;
+  geometry::Frustum* frustum;
   const double accel_factor;
 };
 
@@ -126,65 +128,75 @@ public:
   typedef openvdb::math::Ray<openvdb::Real> GridRay;
   typedef openvdb::math::Ray<openvdb::Real>::Vec3T Vec3Type;
 
-  SpatioTemporalVoxelGrid(
-    rclcpp::Clock::SharedPtr clock,
-    const float & voxel_size, const double & background_value,
-    const int & decay_model, const double & voxel_decay,
-    const bool & pub_voxels);
+  SpatioTemporalVoxelGrid(rclcpp::Clock::SharedPtr clock, const float& voxel_size, const double& background_value,
+                          const int& decay_model, const double& voxel_decay, const bool& pub_voxels);
   ~SpatioTemporalVoxelGrid(void);
 
   // Core making and clearing functions
-  void Mark(const std::vector<observation::MeasurementReading> & marking_observations);
-  void operator()(const observation::MeasurementReading & obs) const;
-  void ClearFrustums(
-    const std::vector<observation::MeasurementReading> & clearing_observations,
-    std::unordered_set<occupany_cell> & cleared_cells);
+  void Mark(const std::vector<observation::MeasurementReading>& marking_observations, const double& robot_x,
+            const double& robot_y);
+  void operator()(const observation::MeasurementReading& obs) const;
+  void ClearFrustums(const std::vector<observation::MeasurementReading>& clearing_observations,
+                     std::unordered_set<occupany_cell>& cleared_cells);
 
   // Get the pointcloud of the underlying occupancy grid
-  void GetOccupancyPointCloud(std::unique_ptr<sensor_msgs::msg::PointCloud2> & pc2);
-  std::unordered_map<occupany_cell, uint> * GetFlattenedCostmap();
+  void GetOccupancyPointCloud(std::unique_ptr<sensor_msgs::msg::PointCloud2>& pc2);
+  std::unordered_map<occupany_cell, uint>* GetFlattenedCostmap();
 
   // Clear the grid
   bool ResetGrid(void);
-  void ResetGridArea(const occupany_cell & start, const occupany_cell & end, bool invert_area=false);
+  void ResetGridArea(const occupany_cell& start, const occupany_cell& end, bool invert_area = false);
+
+  // Set / get raw paths from LaneCenterPaths (AABB computed in SelectActiveIgnoreRects)
+  void SetIgnorePolygons(const std::vector<nav_msgs::msg::Path>& paths);
+  std::vector<nav_msgs::msg::Path> GetIgnorePolygons() const;
+
+  // Set ignore width dynamically (atomic)
+  void SetIgnoreWidth(int width);
+  int GetIgnoreWidth() const;
+
+  // Set ignore range dynamically (atomic) — only poses within this distance of robot are used
+  void SetIgnoreRange(double range);
+  double GetIgnoreRange() const;
+
+  // Pre-select active (left or right) ignore rects based on robot position — call once before point loop
+  void SelectActiveIgnoreRects(const double& robot_x, const double& robot_y);
 
   // Save the file to file with size information
-  bool SaveGrid(const std::string & file_name, double & map_size_bytes);
-  double CrossProduct(const geometry_msgs::msg::Point & first_point,
-                      const geometry_msgs::msg::Point & second_point,
-                      const geometry_msgs::msg::Point & point) const;
-  bool IsPointInRectangle(const geometry_msgs::msg::Point& inside,
-                          const geometry_msgs::msg::Point& outside,
+  bool SaveGrid(const std::string& file_name, double& map_size_bytes);
+  double CrossProduct(const geometry_msgs::msg::Point& first_point, const geometry_msgs::msg::Point& second_point,
+                      const geometry_msgs::msg::Point& point) const;
+  bool IsPointInRectangle(const geometry_msgs::msg::Point& inside, const geometry_msgs::msg::Point& outside,
                           const geometry_msgs::msg::Point& extend_outside,
-                          const geometry_msgs::msg::Point& extend_inside,
-                          const geometry_msgs::msg::Point& point) const;
+                          const geometry_msgs::msg::Point& extend_inside, const geometry_msgs::msg::Point& point) const;
   bool AreVerticesOrdered(const std::vector<geometry_msgs::msg::Point>& rectvertices);
+
+  // Check if a point lies inside any active ignore rect (uses pre-selected rects from SelectActiveIgnoreRects)
+  bool IsPointInAnyIgnorePolygon(const double& px, const double& py) const;
 
 protected:
   // Initialize grid metadata and library
   void InitializeGrid(void);
 
   // grid accessor methods
-  bool MarkGridPoint(const openvdb::Coord & pt, const double & value) const;
-  bool ClearGridPoint(const openvdb::Coord & pt) const;
+  bool MarkGridPoint(const openvdb::Coord& pt, const double& value) const;
+  bool ClearGridPoint(const openvdb::Coord& pt) const;
 
   // Check occupancy status of the grid
   bool IsGridEmpty(void) const;
 
   // Get time information for clearing
-  double GetTemporalClearingDuration(const double & time_delta);
-  double GetFrustumAcceleration(
-    const double & time_delta, const double & acceleration_factor);
-  void TemporalClearAndGenerateCostmap(
-    std::vector<frustum_model> & frustums,
-    std::unordered_set<occupany_cell> & cleared_cells);
+  double GetTemporalClearingDuration(const double& time_delta);
+  double GetFrustumAcceleration(const double& time_delta, const double& acceleration_factor);
+  void TemporalClearAndGenerateCostmap(std::vector<frustum_model>& frustums,
+                                       std::unordered_set<occupany_cell>& cleared_cells);
 
   // Populate the costmap ROS api and pointcloud with a marked point
-  void PopulateCostmapAndPointcloud(const openvdb::Coord & pt);
+  void PopulateCostmapAndPointcloud(const openvdb::Coord& pt);
 
   // Utilities for tranformation
-  openvdb::Vec3d WorldToIndex(const openvdb::Vec3d & coord) const;
-  openvdb::Vec3d IndexToWorld(const openvdb::Coord & coord) const;
+  openvdb::Vec3d WorldToIndex(const openvdb::Vec3d& coord) const;
+  openvdb::Vec3d IndexToWorld(const openvdb::Coord& coord) const;
 
   rclcpp::Clock::SharedPtr _clock;
 
@@ -193,7 +205,12 @@ protected:
   double _background_value, _voxel_size, _voxel_decay;
   bool _pub_voxels;
   std::unique_ptr<std::vector<geometry_msgs::msg::Point32>> _grid_points;
-  std::unordered_map<occupany_cell, uint> * _cost_map;
+  std::unordered_map<occupany_cell, uint>* _cost_map;
+  mutable std::vector<nav_msgs::msg::Path> _ignore_paths;
+  mutable std::vector<geometry_msgs::msg::PolygonStamped> _active_ignore_rects;
+  mutable boost::mutex _ignore_polygons_lock;
+  std::atomic<int> _ignore_width{ 0 };
+  std::atomic<double> _ignore_range{ 5.0 };
   boost::mutex _grid_lock;
 };
 
@@ -202,10 +219,10 @@ protected:
 // hash function for unordered_map of occupancy_cells
 namespace std
 {
-template<>
+template <>
 struct hash<volume_grid::occupany_cell>
 {
-  std::size_t operator()(const volume_grid::occupany_cell & k) const
+  std::size_t operator()(const volume_grid::occupany_cell& k) const
   {
     return (std::hash<double>()(k.x) ^ (std::hash<double>()(k.y) << 1)) >> 1;
   }

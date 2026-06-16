@@ -1,0 +1,160 @@
+# =========================
+# 编译生成的文件 (Compiled files)
+# =========================
+# 可执行文件
+*.exe
+*.dll
+*.so
+*.dylib
+*.out
+*.app
+
+# 对象文件
+*.o
+*.obj
+
+# 预编译头文件
+*.pch
+*.gch
+
+# 静态库和动态库
+*.a
+*.lib
+*.so.*
+*.dylib.*
+
+# =========================
+# 构建系统目录 (Build directories)
+# =========================
+# CMake
+build/
+cmake-build-*/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+compile_commands.json
+
+# Make
+bin/
+obj/
+Debug/
+Release/
+x64/
+x86/
+
+# Conan (C++ 包管理器)
+conanfile.py.lock
+conan.lock
+
+# Vcpkg
+vcpkg_installed/
+
+# =========================
+# IDE 和编辑器配置 (IDE & Editor configs)
+# =========================
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.vcxproj.filters
+*.vcxproj.user
+*.aps
+ipch/
+*.opensdf
+*.opendb
+*.ncb
+*.pdb (可选，如果你不想提交调试符号)
+
+# Visual Studio Code
+.vscode/
+!vscode/settings.json # 如果想共享特定设置，可以取消注释此行
+
+# CLion / IntelliJ
+.idea/
+*.iml
+*.ipr
+*.iws
+cmake-build-debug/
+cmake-build-release/
+
+# Xcode
+*.xcworkspace
+xcuserdata/
+*.xcodeproj/project.xcworkspace/
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+DerivedData/
+
+# Eclipse
+.cproject
+.project
+.settings/
+bin/
+
+# Qt Creator
+*.pro.user
+
+# Vim / Emacs
+*~
+.swp
+.swo
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+
+# =========================
+# 操作系统临时文件 (OS generated files)
+# =========================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.fuse_hidden*
+.nfs*
+
+# =========================
+# 测试覆盖率报告 (Coverage reports)
+# =========================
+coverage/
+*.gcda
+*.gcno
+*.gcov
+lcov_output/
+
+# =========================
+# 其他常见忽略项
+# =========================
+# 日志文件
+*.log
+
+# 备份文件
+*.bak
+*.backup
+
+# 依赖管理 (如果使用了子模块或手动下载的库)
+# vendor/ (视情况而定)
+
+.vscode
+.qwen

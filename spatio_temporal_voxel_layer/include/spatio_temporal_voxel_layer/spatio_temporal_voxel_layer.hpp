@@ -66,6 +66,8 @@
 #include "sensor_msgs/msg/laser_scan.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
 #include "geometry_msgs/msg/point.hpp"
+#include "nav_msgs/msg/path.hpp"
+#include "capella_ros_msg/msg/lane_center_paths.hpp"
 #include "spatio_temporal_voxel_layer/srv/save_grid.hpp"
 #include "std_srvs/srv/set_bool.hpp"
 // projector
@@ -81,9 +83,8 @@ namespace spatio_temporal_voxel_layer
 {
 
 // conveniences for line lengths
-typedef std::vector<
-  std::shared_ptr<message_filters::SubscriberBase<rclcpp_lifecycle::LifecycleNode>>
-  >::iterator observation_subscribers_iter;
+typedef std::vector<std::shared_ptr<message_filters::SubscriberBase<rclcpp_lifecycle::LifecycleNode>>>::iterator
+    observation_subscribers_iter;
 typedef std::vector<std::shared_ptr<buffer::MeasurementBuffer>>::iterator observation_buffers_iter;
 
 // Core ROS voxel layer class
@@ -95,11 +96,9 @@ public:
 
   // Core Functions
   virtual void onInitialize(void);
-  virtual void updateBounds(
-    double robot_x, double robot_y, double robot_yaw,
-    double * min_x, double * min_y, double * max_x, double * max_y);
-  virtual void updateCosts(
-    nav2_costmap_2d::Costmap2D & master_grid, int min_i, int min_j, int max_i, int max_j);
+  virtual void updateBounds(double robot_x, double robot_y, double robot_yaw, double* min_x, double* min_y,
+                            double* max_x, double* max_y);
+  virtual void updateCosts(nav2_costmap_2d::Costmap2D& master_grid, int min_i, int min_j, int max_i, int max_j);
 
   // Functions to interact with other layers
   virtual void matchSize(void);
@@ -108,69 +107,65 @@ public:
   virtual void reset(void);
   virtual void activate(void);
   virtual void deactivate(void);
-  virtual void clearArea(int start_x, int start_y, int end_x, int end_y, bool invert_area=false) override;
+  virtual void clearArea(int start_x, int start_y, int end_x, int end_y, bool invert_area = false) override;
 
-  virtual bool isClearable() {return true;}
+  virtual bool isClearable()
+  {
+    return true;
+  }
 
   // Functions for sensor feeds
-  bool GetMarkingObservations(std::vector<observation::MeasurementReading> & marking_observations)
-  const;
-  bool GetClearingObservations(std::vector<observation::MeasurementReading> & marking_observations)
-  const;
+  bool GetMarkingObservations(std::vector<observation::MeasurementReading>& marking_observations) const;
+  bool GetClearingObservations(std::vector<observation::MeasurementReading>& marking_observations) const;
   void ObservationsResetAfterReading() const;
 
   // Functions to interact with maps
-  void UpdateROSCostmap(
-    double * min_x, double * min_y, double * max_x, double * max_y,
-    std::unordered_set<volume_grid::occupany_cell> & cleared_cells);
-  bool updateFootprint(
-    double robot_x, double robot_y, double robot_yaw,
-    double * min_x, double * min_y, double * max_x, double * max_y);
+  void UpdateROSCostmap(double* min_x, double* min_y, double* max_x, double* max_y,
+                        std::unordered_set<volume_grid::occupany_cell>& cleared_cells);
+  bool updateFootprint(double robot_x, double robot_y, double robot_yaw, double* min_x, double* min_y, double* max_x,
+                       double* max_y);
   void ResetGrid(void);
 
   // Saving grids callback for openVDB
-  void SaveGridCallback(
-    const std::shared_ptr<rmw_request_id_t>/*header*/,
-    std::shared_ptr<spatio_temporal_voxel_layer::srv::SaveGrid::Request> req,
-    std::shared_ptr<spatio_temporal_voxel_layer::srv::SaveGrid::Response> resp);
+  void SaveGridCallback(const std::shared_ptr<rmw_request_id_t> /*header*/,
+                        std::shared_ptr<spatio_temporal_voxel_layer::srv::SaveGrid::Request> req,
+                        std::shared_ptr<spatio_temporal_voxel_layer::srv::SaveGrid::Response> resp);
 
 private:
   // Sensor callbacks
-  void LaserScanCallback(
-    sensor_msgs::msg::LaserScan::ConstSharedPtr message,
-    const std::shared_ptr<buffer::MeasurementBuffer> & buffer,
-    const std::shared_ptr<laser_geometry::LaserProjection> & laser_projector);
-  void LaserScanValidInfCallback(
-    sensor_msgs::msg::LaserScan::ConstSharedPtr raw_message,
-    const std::shared_ptr<buffer::MeasurementBuffer> & buffer,
-    const std::shared_ptr<laser_geometry::LaserProjection> & laser_projector);
-  void PointCloud2Callback(
-    sensor_msgs::msg::PointCloud2::ConstSharedPtr message,
-    const std::shared_ptr<buffer::MeasurementBuffer> & buffer);
+  void LaserScanCallback(sensor_msgs::msg::LaserScan::ConstSharedPtr message,
+                         const std::shared_ptr<buffer::MeasurementBuffer>& buffer,
+                         const std::shared_ptr<laser_geometry::LaserProjection>& laser_projector);
+  void LaserScanValidInfCallback(sensor_msgs::msg::LaserScan::ConstSharedPtr raw_message,
+                                 const std::shared_ptr<buffer::MeasurementBuffer>& buffer,
+                                 const std::shared_ptr<laser_geometry::LaserProjection>& laser_projector);
+  void PointCloud2Callback(sensor_msgs::msg::PointCloud2::ConstSharedPtr message,
+                           const std::shared_ptr<buffer::MeasurementBuffer>& buffer);
+
+  // LaneCenterPaths callback for ignore polygons
+  void LaneCenterPathsCallback(capella_ros_msg::msg::LaneCenterPaths::ConstSharedPtr msg);
 
   // Functions for adding static obstacle zones
-  bool AddStaticObservations(const observation::MeasurementReading & obs);
+  bool AddStaticObservations(const observation::MeasurementReading& obs);
   bool RemoveStaticObservations(void);
 
   // Enable/Disable callback
-  void BufferEnablerCallback(const std::shared_ptr<rmw_request_id_t> request_header,
-    const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
-    std::shared_ptr<std_srvs::srv::SetBool::Response> response,
-    const std::shared_ptr<buffer::MeasurementBuffer> buffer,
-    const std::shared_ptr<message_filters::SubscriberBase<rclcpp_lifecycle::LifecycleNode>>
-      & subcriber
-    );
+  void BufferEnablerCallback(
+      const std::shared_ptr<rmw_request_id_t> request_header,
+      const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
+      std::shared_ptr<std_srvs::srv::SetBool::Response> response,
+      const std::shared_ptr<buffer::MeasurementBuffer> buffer,
+      const std::shared_ptr<message_filters::SubscriberBase<rclcpp_lifecycle::LifecycleNode>>& subcriber);
 
   /**
    * @brief Callback executed when a paramter change is detected
    * @param parameters list of changed parameters
    */
-  rcl_interfaces::msg::SetParametersResult
-    dynamicParametersCallback(std::vector<rclcpp::Parameter> parameters);
+  rcl_interfaces::msg::SetParametersResult dynamicParametersCallback(std::vector<rclcpp::Parameter> parameters);
 
   // laser_geometry::LaserProjection _laser_projector;
   std::vector<std::shared_ptr<message_filters::SubscriberBase<rclcpp_lifecycle::LifecycleNode>>>
-    _observation_subscribers;
+      _observation_subscribers;
   std::vector<std::shared_ptr<tf2_ros::MessageFilterBase>> _observation_notifiers;
   std::vector<std::shared_ptr<buffer::MeasurementBuffer>> _observation_buffers;
   std::vector<std::shared_ptr<buffer::MeasurementBuffer>> _marking_buffers;
@@ -193,6 +188,9 @@ private:
   boost::recursive_mutex _voxel_grid_lock;
 
   std::string _topics_string;
+
+  // LaneCenterPaths subscriber for ignore polygons
+  rclcpp::Subscription<capella_ros_msg::msg::LaneCenterPaths>::SharedPtr _lane_center_paths_sub;
 
   // Dynamic parameters handler
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr dyn_params_handler;
