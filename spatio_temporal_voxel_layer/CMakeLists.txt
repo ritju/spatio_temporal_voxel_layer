@@ -20,8 +20,7 @@ find_package(geometry_msgs REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
-find_package(nav_msgs REQUIRED)
-find_package(capella_ros_msg REQUIRED)
+find_package(nav2_ignore_polygon_manager REQUIRED)
 find_package(laser_geometry REQUIRED)
 find_package(message_filters REQUIRED)
 find_package(pcl_conversions REQUIRED)
@@ -64,8 +63,7 @@ set(dependencies
   sensor_msgs
   std_msgs
   std_srvs
-  nav_msgs
-  capella_ros_msg
+  nav2_ignore_polygon_manager
   laser_geometry
   message_filters
   pcl_conversions

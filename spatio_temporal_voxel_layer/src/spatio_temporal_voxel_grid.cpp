@@ -41,7 +41,6 @@
 #include <vector>
 #include <cmath>
 #include <algorithm>
-#include <limits>
 
 #include "spatio_temporal_voxel_layer/spatio_temporal_voxel_grid.hpp"
 
@@ -280,7 +279,10 @@ void SpatioTemporalVoxelGrid::Mark(const std::vector<observation::MeasurementRea
   boost::unique_lock<boost::mutex> lock(_grid_lock);
 
   // Pre-select active ignore rects once before processing any points
-  SelectActiveIgnoreRects(robot_x, robot_y);
+  if (_ignore_manager)
+  {
+    _ignore_manager->update(robot_x, robot_y);
+  }
 
   // mark the grid
   if (marking_readings.size() > 0)
@@ -330,7 +332,8 @@ void SpatioTemporalVoxelGrid::operator()(const observation::MeasurementReading& 
         }
       }
 
-      if (IsPointInAnyIgnorePolygon(static_cast<double>(*iter_x), static_cast<double>(*iter_y)))
+      if (_ignore_manager &&
+          _ignore_manager->isPointIgnored(static_cast<double>(*iter_x), static_cast<double>(*iter_y)))
       {
         continue;
       }
@@ -632,249 +635,11 @@ bool SpatioTemporalVoxelGrid::AreVerticesOrdered(const std::vector<geometry_msgs
 }
 
 /*****************************************************************************/
-void SpatioTemporalVoxelGrid::SetIgnorePolygons(const std::vector<nav_msgs::msg::Path>& paths)
+void SpatioTemporalVoxelGrid::SetIgnoreManager(
+    const std::shared_ptr<nav2_ignore_polygon_manager::IgnorePolygonManager>& manager)
 /*****************************************************************************/
 {
-  boost::mutex::scoped_lock lock(_ignore_polygons_lock);
-  _ignore_paths = paths;
-}
-
-/*****************************************************************************/
-std::vector<nav_msgs::msg::Path> SpatioTemporalVoxelGrid::GetIgnorePolygons() const
-/*****************************************************************************/
-{
-  boost::mutex::scoped_lock lock(_ignore_polygons_lock);
-  return _ignore_paths;
-}
-
-/*****************************************************************************/
-void SpatioTemporalVoxelGrid::SetIgnoreWidth(int width)
-/*****************************************************************************/
-{
-  _ignore_width.store(width);
-}
-
-/*****************************************************************************/
-int SpatioTemporalVoxelGrid::GetIgnoreWidth() const
-/*****************************************************************************/
-{
-  return _ignore_width.load();
-}
-
-/*****************************************************************************/
-void SpatioTemporalVoxelGrid::SetIgnoreRange(double range)
-/*****************************************************************************/
-{
-  _ignore_range.store(range);
-}
-
-/*****************************************************************************/
-double SpatioTemporalVoxelGrid::GetIgnoreRange() const
-/*****************************************************************************/
-{
-  return _ignore_range.load();
-}
-
-/*****************************************************************************/
-void SpatioTemporalVoxelGrid::SelectActiveIgnoreRects(const double& robot_x, const double& robot_y)
-/*****************************************************************************/
-{
-  const int width = _ignore_width.load();
-  if (width == 0)
-  {
-    boost::mutex::scoped_lock lock(_ignore_polygons_lock);
-    _active_ignore_rects.clear();
-    return;
-  }
-
-  const double offset = std::abs(static_cast<double>(width)) / 100.0;  // convert cm to meters
-  const double range = _ignore_range.load();
-  const double range_sq = range * range;
-
-  boost::mutex::scoped_lock lock(_ignore_polygons_lock);
-  _active_ignore_rects.clear();
-
-  for (const auto& path : _ignore_paths)
-  {
-    if (path.poses.size() < 2)
-    {
-      continue;
-    }
-
-    // Step 1: For each segment, check if it intersects the range circle (point-to-segment distance)
-    std::vector<size_t> nearby_segments;
-    for (size_t i = 0; i + 1 < path.poses.size(); ++i)
-    {
-      const double ax = path.poses[i].pose.position.x;
-      const double ay = path.poses[i].pose.position.y;
-      const double bx = path.poses[i + 1].pose.position.x;
-      const double by = path.poses[i + 1].pose.position.y;
-
-      const double seg_dx = bx - ax;
-      const double seg_dy = by - ay;
-      const double seg_len_sq = seg_dx * seg_dx + seg_dy * seg_dy;
-
-      double min_dist_sq;
-      if (seg_len_sq < 1e-18)
-      {
-        // Degenerate segment, treat as point
-        const double dx = ax - robot_x;
-        const double dy = ay - robot_y;
-        min_dist_sq = dx * dx + dy * dy;
-      }
-      else
-      {
-        // Project robot onto segment line, clamp to [0,1]
-        const double to_ax = robot_x - ax;
-        const double to_ay = robot_y - ay;
-        double t = (to_ax * seg_dx + to_ay * seg_dy) / seg_len_sq;
-        t = std::max(0.0, std::min(1.0, t));
-
-        // Closest point on segment to robot
-        const double closest_x = ax + t * seg_dx;
-        const double closest_y = ay + t * seg_dy;
-        const double dx = closest_x - robot_x;
-        const double dy = closest_y - robot_y;
-        min_dist_sq = dx * dx + dy * dy;
-      }
-
-      if (min_dist_sq <= range_sq)
-      {
-        nearby_segments.push_back(i);
-      }
-    }
-
-    if (nearby_segments.empty())
-    {
-      continue;
-    }
-
-    // Step 2: For each nearby segment, generate a fine-grained rectangle
-    for (const auto i : nearby_segments)
-    {
-      const size_t j = i + 1;
-
-      const auto& p0 = path.poses[i].pose.position;
-      const auto& p1 = path.poses[j].pose.position;
-
-      // Compute tangent direction (average of tangents at i and j)
-      double dx0, dy0;
-      if (i == 0)
-      {
-        dx0 = path.poses[1].pose.position.x - p0.x;
-        dy0 = path.poses[1].pose.position.y - p0.y;
-      }
-      else
-      {
-        dx0 = p0.x - path.poses[i - 1].pose.position.x;
-        dy0 = p0.y - path.poses[i - 1].pose.position.y;
-      }
-
-      double dx1, dy1;
-      if (j == path.poses.size() - 1)
-      {
-        dx1 = p1.x - path.poses[j - 1].pose.position.x;
-        dy1 = p1.y - path.poses[j - 1].pose.position.y;
-      }
-      else
-      {
-        dx1 = path.poses[j + 1].pose.position.x - p1.x;
-        dy1 = path.poses[j + 1].pose.position.y - p1.y;
-      }
-
-      const double len0 = std::sqrt(dx0 * dx0 + dy0 * dy0);
-      const double len1 = std::sqrt(dx1 * dx1 + dy1 * dy1);
-      if (len0 < 1e-9 || len1 < 1e-9)
-      {
-        continue;
-      }
-
-      // Normal vectors (rotated 90° counter-clockwise)
-      const double nx0 = -dy0 / len0;
-      const double ny0 = dx0 / len0;
-      const double nx1 = -dy1 / len1;
-      const double ny1 = dx1 / len1;
-
-      // Determine robot side via cross product at midpoint
-      const double mid_x = (p0.x + p1.x) * 0.5;
-      const double mid_y = (p0.y + p1.y) * 0.5;
-      const double dir_x = p1.x - p0.x;
-      const double dir_y = p1.y - p0.y;
-      const double to_robot_x = robot_x - mid_x;
-      const double to_robot_y = robot_y - mid_y;
-      const double cross = dir_x * to_robot_y - dir_y * to_robot_x;
-
-      // If cross > 0, robot is on left (positive normal direction), ignore left side
-      // If cross < 0, robot is on right (negative normal direction), ignore right side
-      const double sign = (cross >= 0) ? 1.0 : -1.0;
-
-      // Generate offset points on the robot's side
-      const double ox0 = p0.x + sign * nx0 * offset;
-      const double oy0 = p0.y + sign * ny0 * offset;
-      const double ox1 = p1.x + sign * nx1 * offset;
-      const double oy1 = p1.y + sign * ny1 * offset;
-
-      // Build AABB rectangle from path points and offset points
-      double min_x = std::min({ p0.x, p1.x, ox0, ox1 });
-      double max_x = std::max({ p0.x, p1.x, ox0, ox1 });
-      double min_y = std::min({ p0.y, p1.y, oy0, oy1 });
-      double max_y = std::max({ p0.y, p1.y, oy0, oy1 });
-
-      geometry_msgs::msg::PolygonStamped rect;
-      rect.header = path.header;
-
-      geometry_msgs::msg::Point32 c0, c1, c2, c3;
-      c0.x = static_cast<float>(min_x);
-      c0.y = static_cast<float>(min_y);
-      c0.z = 0.0f;
-      c1.x = static_cast<float>(max_x);
-      c1.y = static_cast<float>(min_y);
-      c1.z = 0.0f;
-      c2.x = static_cast<float>(max_x);
-      c2.y = static_cast<float>(max_y);
-      c2.z = 0.0f;
-      c3.x = static_cast<float>(min_x);
-      c3.y = static_cast<float>(max_y);
-      c3.z = 0.0f;
-
-      rect.polygon.points = { c0, c1, c2, c3 };
-      _active_ignore_rects.push_back(rect);
-    }
-  }
-}
-
-/*****************************************************************************/
-bool SpatioTemporalVoxelGrid::IsPointInAnyIgnorePolygon(const double& px, const double& py) const
-/*****************************************************************************/
-{
-  // No lock needed — _active_ignore_rects is set by SelectActiveIgnoreRects under _grid_lock,
-  // and operator() is also called under _grid_lock (from Mark).
-  for (const auto& polygon_stamped : _active_ignore_rects)
-  {
-    const auto& pts = polygon_stamped.polygon.points;
-    if (pts.size() < 4)
-      continue;
-
-    geometry_msgs::msg::Point inside, outside, extend_outside, extend_inside;
-    inside.x = pts[0].x;
-    inside.y = pts[0].y;
-    outside.x = pts[2].x;
-    outside.y = pts[2].y;
-    extend_outside.x = pts[3].x;
-    extend_outside.y = pts[3].y;
-    extend_inside.x = pts[1].x;
-    extend_inside.y = pts[1].y;
-
-    geometry_msgs::msg::Point point;
-    point.x = px;
-    point.y = py;
-
-    if (IsPointInRectangle(inside, outside, extend_outside, extend_inside, point))
-    {
-      return true;
-    }
-  }
-  return false;
+  _ignore_manager = manager;
 }
 
 }  // namespace volume_grid

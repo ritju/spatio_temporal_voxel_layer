@@ -66,8 +66,6 @@
 #include "sensor_msgs/msg/laser_scan.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
 #include "geometry_msgs/msg/point.hpp"
-#include "nav_msgs/msg/path.hpp"
-#include "capella_ros_msg/msg/lane_center_paths.hpp"
 #include "spatio_temporal_voxel_layer/srv/save_grid.hpp"
 #include "std_srvs/srv/set_bool.hpp"
 // projector
@@ -142,9 +140,6 @@ private:
   void PointCloud2Callback(sensor_msgs::msg::PointCloud2::ConstSharedPtr message,
                            const std::shared_ptr<buffer::MeasurementBuffer>& buffer);
 
-  // LaneCenterPaths callback for ignore polygons
-  void LaneCenterPathsCallback(capella_ros_msg::msg::LaneCenterPaths::ConstSharedPtr msg);
-
   // Functions for adding static obstacle zones
   bool AddStaticObservations(const observation::MeasurementReading& obs);
   bool RemoveStaticObservations(void);
@@ -189,8 +184,8 @@ private:
 
   std::string _topics_string;
 
-  // LaneCenterPaths subscriber for ignore polygons
-  rclcpp::Subscription<capella_ros_msg::msg::LaneCenterPaths>::SharedPtr _lane_center_paths_sub;
+  // Ignore polygon manager
+  std::shared_ptr<nav2_ignore_polygon_manager::IgnorePolygonManager> _ignore_manager;
 
   // Dynamic parameters handler
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr dyn_params_handler;

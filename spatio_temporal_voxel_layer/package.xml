@@ -21,8 +21,7 @@
   <depend>sensor_msgs</depend>
   <depend>std_msgs</depend>
   <depend>std_srvs</depend>
-  <depend>nav_msgs</depend>
-  <depend>capella_ros_msg</depend>
+  <depend>nav2_ignore_polygon_manager</depend>
   <depend>laser_geometry</depend>
   <depend>libpcl-all</depend>
   <depend>pcl_conversions</depend>

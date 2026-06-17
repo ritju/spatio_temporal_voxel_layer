@@ -50,7 +50,6 @@
 #include <vector>
 #include <memory>
 #include <string>
-#include <atomic>
 // PCL
 #include "pcl/common/transforms.h"
 #include "pcl/PCLPointCloud2.h"
@@ -63,8 +62,6 @@
 #include "visualization_msgs/msg/marker.hpp"
 #include "geometry_msgs/msg/point.hpp"
 #include "geometry_msgs/msg/point32.hpp"
-#include "geometry_msgs/msg/polygon_stamped.hpp"
-#include "nav_msgs/msg/path.hpp"
 // OpenVDB
 #include "openvdb/openvdb.h"
 #include "openvdb/tools/GridTransformer.h"
@@ -74,6 +71,8 @@
 #include "spatio_temporal_voxel_layer/measurement_buffer.hpp"
 #include "spatio_temporal_voxel_layer/frustum_models/depth_camera_frustum.hpp"
 #include "spatio_temporal_voxel_layer/frustum_models/three_dimensional_lidar_frustum.hpp"
+// ignore polygon manager
+#include "nav2_ignore_polygon_manager/ignore_polygon_manager.hpp"
 // Mutex and locks
 #include "boost/thread.hpp"
 #include "boost/thread/recursive_mutex.hpp"
@@ -147,20 +146,8 @@ public:
   bool ResetGrid(void);
   void ResetGridArea(const occupany_cell& start, const occupany_cell& end, bool invert_area = false);
 
-  // Set / get raw paths from LaneCenterPaths (AABB computed in SelectActiveIgnoreRects)
-  void SetIgnorePolygons(const std::vector<nav_msgs::msg::Path>& paths);
-  std::vector<nav_msgs::msg::Path> GetIgnorePolygons() const;
-
-  // Set ignore width dynamically (atomic)
-  void SetIgnoreWidth(int width);
-  int GetIgnoreWidth() const;
-
-  // Set ignore range dynamically (atomic) — only poses within this distance of robot are used
-  void SetIgnoreRange(double range);
-  double GetIgnoreRange() const;
-
-  // Pre-select active (left or right) ignore rects based on robot position — call once before point loop
-  void SelectActiveIgnoreRects(const double& robot_x, const double& robot_y);
+  // Set the ignore polygon manager (externally owned)
+  void SetIgnoreManager(const std::shared_ptr<nav2_ignore_polygon_manager::IgnorePolygonManager>& manager);
 
   // Save the file to file with size information
   bool SaveGrid(const std::string& file_name, double& map_size_bytes);
@@ -170,9 +157,6 @@ public:
                           const geometry_msgs::msg::Point& extend_outside,
                           const geometry_msgs::msg::Point& extend_inside, const geometry_msgs::msg::Point& point) const;
   bool AreVerticesOrdered(const std::vector<geometry_msgs::msg::Point>& rectvertices);
-
-  // Check if a point lies inside any active ignore rect (uses pre-selected rects from SelectActiveIgnoreRects)
-  bool IsPointInAnyIgnorePolygon(const double& px, const double& py) const;
 
 protected:
   // Initialize grid metadata and library
@@ -206,11 +190,7 @@ protected:
   bool _pub_voxels;
   std::unique_ptr<std::vector<geometry_msgs::msg::Point32>> _grid_points;
   std::unordered_map<occupany_cell, uint>* _cost_map;
-  mutable std::vector<nav_msgs::msg::Path> _ignore_paths;
-  mutable std::vector<geometry_msgs::msg::PolygonStamped> _active_ignore_rects;
-  mutable boost::mutex _ignore_polygons_lock;
-  std::atomic<int> _ignore_width{ 0 };
-  std::atomic<double> _ignore_range{ 5.0 };
+  std::shared_ptr<nav2_ignore_polygon_manager::IgnorePolygonManager> _ignore_manager;
   boost::mutex _grid_lock;
 };
 

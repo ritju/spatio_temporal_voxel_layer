@@ -154,27 +154,10 @@ void SpatioTemporalVoxelLayer::onInitialize(void)
 
   RCLCPP_INFO(logger_, "%s created underlying voxel grid.", getName().c_str());
 
-  // LaneCenterPaths ignore width parameter and subscriber
-  declareParameter("ignore_width", rclcpp::ParameterValue(0));
-  int init_width = 0;
-  node->get_parameter(name_ + ".ignore_width", init_width);
-  _voxel_grid->SetIgnoreWidth(init_width);
-  RCLCPP_INFO(logger_, "%s ignore_width set to %d.", getName().c_str(), init_width);
-
-  declareParameter("ignore_range", rclcpp::ParameterValue(5.0));
-  double init_range = 5.0;
-  node->get_parameter(name_ + ".ignore_range", init_range);
-  _voxel_grid->SetIgnoreRange(init_range);
-  RCLCPP_INFO(logger_, "%s ignore_range set to %.2f.", getName().c_str(), init_range);
-
-  rclcpp::QoS lane_qos(10);
-  lane_qos.transient_local();
-  lane_qos.reliable();
-
-  _lane_center_paths_sub = node->create_subscription<capella_ros_msg::msg::LaneCenterPaths>(
-      "edge_reference_paths_no_collision_check", lane_qos,
-      std::bind(&SpatioTemporalVoxelLayer::LaneCenterPathsCallback, this, std::placeholders::_1));
-  RCLCPP_INFO(logger_, "%s subscribed to edge_reference_paths_no_collision_check.", getName().c_str());
+  // Ignore polygon manager
+  _ignore_manager = std::make_shared<nav2_ignore_polygon_manager::IgnorePolygonManager>(node_, name_);
+  _voxel_grid->SetIgnoreManager(_ignore_manager);
+  RCLCPP_INFO(logger_, "%s ignore polygon manager created.", getName().c_str());
 
   std::stringstream ss(_topics_string);
   std::string source;
@@ -482,26 +465,6 @@ void SpatioTemporalVoxelLayer::PointCloud2Callback(sensor_msgs::msg::PointCloud2
   buffer->Lock();
   buffer->BufferROSCloud(*message);
   buffer->Unlock();
-}
-
-/*****************************************************************************/
-void SpatioTemporalVoxelLayer::LaneCenterPathsCallback(capella_ros_msg::msg::LaneCenterPaths::ConstSharedPtr msg)
-/*****************************************************************************/
-{
-  std::vector<nav_msgs::msg::Path> paths;
-  paths.reserve(msg->paths.size());
-
-  for (const auto& path : msg->paths)
-  {
-    if (path.poses.size() >= 2)
-    {
-      paths.push_back(path);
-    }
-  }
-
-  _voxel_grid->SetIgnorePolygons(paths);
-  RCLCPP_DEBUG(logger_, "%s received %zu paths, stored %zu valid paths.", getName().c_str(), msg->paths.size(),
-               paths.size());
 }
 
 /*****************************************************************************/
@@ -1058,7 +1021,7 @@ SpatioTemporalVoxelLayer::dynamicParametersCallback(std::vector<rclcpp::Paramete
       else if (name == name_ + "." + "ignore_width")
       {
         const int new_width = parameter.as_int();
-        _voxel_grid->SetIgnoreWidth(new_width);
+        _ignore_manager->setIgnoreWidth(new_width);
         RCLCPP_INFO(logger_, "%s ignore_width dynamically updated to %d.", getName().c_str(), new_width);
       }
     }
