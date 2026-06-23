@@ -156,6 +156,7 @@ void SpatioTemporalVoxelLayer::onInitialize(void)
 
   // Ignore polygon manager
   _ignore_manager = std::make_shared<nav2_ignore_polygon_manager::IgnorePolygonManager>(node_, name_);
+  _ignore_manager->configure();
   _voxel_grid->SetIgnoreManager(_ignore_manager);
   RCLCPP_INFO(logger_, "%s ignore polygon manager created.", getName().c_str());
 

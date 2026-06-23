@@ -309,6 +309,13 @@ void SpatioTemporalVoxelGrid::operator()(const observation::MeasurementReading& 
     sensor_msgs::PointCloud2ConstIterator<float> iter_y(cloud, "y");
     sensor_msgs::PointCloud2ConstIterator<float> iter_z(cloud, "z");
 
+    const bool debug = _ignore_manager && _ignore_manager->getDebugMode();
+    std::vector<geometry_msgs::msg::Point32> marked_points;
+    if (debug)
+    {
+      marked_points.reserve(cloud.width * cloud.height);
+    }
+
     for (; iter_x != iter_x.end(); ++iter_x, ++iter_y, ++iter_z)
     {
       float distance_2 = (*iter_x - obs._origin.x) * (*iter_x - obs._origin.x) +
@@ -348,6 +355,38 @@ void SpatioTemporalVoxelGrid::operator()(const observation::MeasurementReading& 
       {
         std::cout << "Failed to mark point." << std::endl;
       }
+
+      if (debug)
+      {
+        geometry_msgs::msg::Point32 pt;
+        pt.x = *iter_x;
+        pt.y = *iter_y;
+        pt.z = *iter_z;
+        marked_points.push_back(pt);
+      }
+    }
+
+    if (debug && !marked_points.empty())
+    {
+      auto pc2 = std::make_unique<sensor_msgs::msg::PointCloud2>();
+      sensor_msgs::PointCloud2Modifier modifier(*pc2);
+      modifier.setPointCloud2FieldsByString(1, "xyz");
+      modifier.resize(marked_points.size());
+
+      sensor_msgs::PointCloud2Iterator<float> pc2_x(*pc2, "x");
+      sensor_msgs::PointCloud2Iterator<float> pc2_y(*pc2, "y");
+      sensor_msgs::PointCloud2Iterator<float> pc2_z(*pc2, "z");
+      for (const auto& pt : marked_points)
+      {
+        *pc2_x = pt.x;
+        *pc2_y = pt.y;
+        *pc2_z = pt.z;
+        ++pc2_x; ++pc2_y; ++pc2_z;
+      }
+
+      pc2->header.stamp = _clock->now();
+      pc2->header.frame_id = cloud.header.frame_id;
+      _ignore_manager->publishCollisionPoints(std::move(pc2));
     }
   }
 }
