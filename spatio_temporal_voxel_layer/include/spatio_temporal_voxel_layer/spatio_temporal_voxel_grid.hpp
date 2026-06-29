@@ -133,7 +133,7 @@ public:
 
   // Core making and clearing functions
   void Mark(const std::vector<observation::MeasurementReading>& marking_observations, const double& robot_x,
-            const double& robot_y);
+            const double& robot_y, const double& robot_z);
   void operator()(const observation::MeasurementReading& obs) const;
   void ClearFrustums(const std::vector<observation::MeasurementReading>& clearing_observations,
                      std::unordered_set<occupany_cell>& cleared_cells);

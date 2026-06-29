@@ -273,7 +273,7 @@ void SpatioTemporalVoxelGrid::PopulateCostmapAndPointcloud(const openvdb::Coord&
 
 /*****************************************************************************/
 void SpatioTemporalVoxelGrid::Mark(const std::vector<observation::MeasurementReading>& marking_readings,
-                                   const double& robot_x, const double& robot_y)
+                                   const double& robot_x, const double& robot_y, const double& robot_z)
 /*****************************************************************************/
 {
   boost::unique_lock<boost::mutex> lock(_grid_lock);
@@ -281,7 +281,7 @@ void SpatioTemporalVoxelGrid::Mark(const std::vector<observation::MeasurementRea
   // Pre-select active ignore rects once before processing any points
   if (_ignore_manager)
   {
-    _ignore_manager->update(robot_x, robot_y);
+    _ignore_manager->update(robot_x, robot_y, robot_z);
   }
 
   // mark the grid
@@ -340,7 +340,7 @@ void SpatioTemporalVoxelGrid::operator()(const observation::MeasurementReading& 
       }
 
       if (_ignore_manager &&
-          _ignore_manager->isPointIgnored(static_cast<double>(*iter_x), static_cast<double>(*iter_y)))
+          _ignore_manager->isPointIgnored(static_cast<double>(*iter_x), static_cast<double>(*iter_y), static_cast<double>(*iter_z)))
       {
         continue;
       }

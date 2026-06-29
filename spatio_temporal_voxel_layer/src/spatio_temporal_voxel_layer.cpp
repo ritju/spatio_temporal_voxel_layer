@@ -826,7 +826,7 @@ void SpatioTemporalVoxelLayer::updateBounds(double robot_x, double robot_y, doub
   }
 
   // mark observations
-  _voxel_grid->Mark(marking_observations, robot_x, robot_y);
+  _voxel_grid->Mark(marking_observations, robot_x, robot_y, 0.0);
 
   // update the ROS Layered Costmap
   UpdateROSCostmap(min_x, min_y, max_x, max_y, cleared_cells);
